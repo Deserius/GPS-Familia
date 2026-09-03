@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>GPS FAMILIA</title>
+  <meta name="theme-color" content="#0b0d0e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GPS FAMILIA" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Cinzel+Decorative:wght@700;900&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "qrcode": "https://esm.sh/qrcode@1.5.3"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div class="map-panel" aria-hidden="true">
+      <div id="map" aria-hidden="true"></div>
+    </div>
+
+    <div id="layer-control" class="layer-control" aria-label="Map layer">
+      <button class="layer-btn active" data-layer="street" title="Street map" type="button">🗺️</button>
+      <button class="layer-btn" data-layer="satellite" title="Satellite" type="button">🛰️</button>
+      <button class="layer-btn" data-layer="terrain" title="Terrain" type="button">⛰️</button>
+    </div>
+
+    <div id="map-tools" class="map-tools" aria-label="Map zoom and refresh">
+      <button id="btn-zoom-in" type="button" title="Zoom in">+</button>
+      <button id="btn-zoom-out" type="button" title="Zoom out">−</button>
+      <button id="btn-map-refresh" type="button" title="Refresh family pins">↻</button>
+      <button id="btn-map-me" type="button" title="Center on me">◎</button>
+      <button id="btn-map-trail" type="button" title="Map or hide my trail">〰</button>
+    </div>
+
+    <div id="pin-sheet" class="pin-sheet" hidden></div>
+
+    <header class="topbar">
+      <div class="left">
+        <button id="btn-account" class="brand-hit" type="button" title="Open menu" aria-label="Open GPS FAMILIA menu">
+          <span class="ham" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="brand-word">GPS FAMILIA</span>
+        </button>
+      </div>
+      <div class="right" id="top-actions">
+        <button id="btn-toggle-tracking" class="tb-btn track-chip" type="button" title="Share your location">Track Off</button>
+        <button id="btn-sos" class="tb-btn sos-btn" type="button" title="Send SOS to all families">SOS</button>
+        <button id="btn-community" class="tb-btn" type="button" title="Community feed"><span class="tb-ico" aria-hidden="true">◈</span><span class="tb-label">Feed</span></button>
+        <button id="btn-search" class="tb-btn" type="button" title="Find people">🔍</button>
+        <button id="btn-inbox" class="tb-btn" type="button" title="Inbox">
+          ✉️
+          <span id="inbox-badge">0</span>
+        </button>
+        <button id="btn-family" class="tb-btn" type="button" title="Family members">👥</button>
+        <button id="btn-help" class="tb-btn" type="button" title="Help">?</button>
+      </div>
+    </header>
+
+    <input id="profile-input" type="file" accept="image/*" capture="environment" hidden />
+
+    <footer class="footer">
+      <div id="status">Not signed in</div>
+      <div id="live-pill" class="live-pill" title="Realtime connection">offline</div>
+    </footer>
+
+    <div id="drawer-scrim" class="drawer-scrim" aria-hidden="true"></div>
+    <aside id="drawer" class="drawer" aria-hidden="true">
+      <div class="drawer-header">
+        <span class="drawer-title">Family Members</span>
+        <button id="drawer-close" class="modal-close" title="Close" type="button">✕</button>
+      </div>
+      <div class="drawer-search">
+        <input id="drawer-find" class="input" type="search" placeholder="Find by name or phone…" autocomplete="off" />
+      </div>
+      <div id="member-list" class="member-list"></div>
+      <div class="drawer-footer">
+        <button id="btn-create-family-drawer" class="btn small" type="button">＋ Create / Join Family</button>
+      </div>
+    </aside>
+
+    <div id="account-scrim" class="drawer-scrim" aria-hidden="true"></div>
+    <aside id="account-drawer" class="account-drawer" aria-hidden="true">
+      <button id="account-close" class="modal-close" title="Close menu" type="button">✕</button>
+      <div class="acct-head">
+        <button id="acct-avatar-btn" class="acct-avatar-btn" type="button" title="Change photo">
+          <img id="acct-avatar" alt="" />
+          <span class="acct-avatar-edit">✎</span>
+        </button>
+        <div id="acct-name" class="acct-name">Not signed in</div>
+        <div id="acct-email" class="acct-meta"></div>
+        <div id="acct-phone" class="acct-meta"></div>
+      </div>
+      <nav id="acct-nav" class="acct-nav"></nav>
+    </aside>
+
+    <aside id="feed-panel" class="feed-panel" aria-hidden="true">
+      <div id="feed-root" class="feed-app"></div>
+    </aside>
+  </div>
+
+  <div id="splash-overlay" aria-hidden="false">
+    <img id="splash-art" src="splash_last_supper_mobsters.png" alt="" />
+    <div id="splash-vignette"></div>
+    <div id="splash-content">
+      <h1 id="splash-title" class="gf-title" aria-label="GPS FAMILIA">
+        <span class="gf-l" style="--s:28px">G</span>
+        <span class="gf-l" style="--s:18px">P</span>
+        <span class="gf-l" style="--s:34px">S</span>
+        <span class="gf-gap" aria-hidden="true"></span>
+        <span class="gf-l" style="--s:16px">F</span>
+        <span class="gf-l" style="--s:30px">A</span>
+        <span class="gf-l" style="--s:22px">M</span>
+        <span class="gf-l" style="--s:36px">I</span>
+        <span class="gf-l" style="--s:18px">L</span>
+        <span class="gf-l" style="--s:26px">I</span>
+        <span class="gf-l" style="--s:20px">A</span>
+      </h1>
+      <div id="splash-sub">Family. Loyalty. Location.</div>
+      <button id="splash-continue" class="btn small" type="button">Enter</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

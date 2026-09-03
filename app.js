@@ -1,0 +1,3350 @@
+import QRCode from "qrcode";
+import { socialBtn, mountDemoPanel, renderCommunityFeed, renderFamilyAdmin, mountCommunityFeed } from "./ui-community.js";
+// Leaflet is loaded via CDN in index.html; we can reference global L once script is parsed.
+// This file extends the app with: tile style toggle (street/satellite), profile images inside markers,
+// persistent named places (home/school/work), and per-user location history logging + viewer.
+// Production additions: server sync, WebSocket realtime, family-only location, multi-family, directory search.
+
+const DB = {
+  usersKey: "f360_users_v1",
+  familiesKey: "f360_families_v1",
+  sessionKey: "f360_session_v1",
+  placesKey: "f360_places_v1",
+  serverMsgsKey: "f360_server_msgs_v1"
+};
+
+const storage = {
+  get(k){ return JSON.parse(localStorage.getItem(k) || "null"); },
+  set(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+};
+
+if(!storage.get(DB.usersKey)) storage.set(DB.usersKey, []);
+if(!storage.get(DB.familiesKey)) storage.set(DB.familiesKey, []);
+if(!storage.get(DB.placesKey)) storage.set(DB.placesKey, []);
+
+const qs = s => document.querySelector(s);
+const THEME_KEY = "f360_theme";
+function applyTheme(name){
+  const allowed = ["dark", "gold", "light", "noir"];
+  const t = allowed.includes(name) ? name : (localStorage.getItem(THEME_KEY) || "dark");
+  document.documentElement.setAttribute("data-theme", t);
+  try{ localStorage.setItem(THEME_KEY, t); }catch(e){}
+  return t;
+}
+applyTheme();
+const make = (tag, props={}, ...children) => {
+  const el = document.createElement(tag);
+  Object.assign(el, props);
+  children.forEach(c => { if(typeof c === "string") el.appendChild(document.createTextNode(c)); else if(c) el.appendChild(c); });
+  return el;
+};
+const uid = (prefix="id") => prefix + "_" + Math.random().toString(36).slice(2,10);
+const now = () => Date.now();
+const digits = s => String(s || "").replace(/\D/g, "");
+function debounce(fn, ms){
+  let t;
+  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+const LEGAL_KEY = "f360_tos_v1";
+const LEGAL_VERSION = "1";
+
+function legalTermsHtml(){
+  return [
+    "<p class=\"legal-lead\">Effective date: September 2, 2026. Please read these Terms of Use, Disclaimer, and Location Disclosure (the “Terms”) in full before using GPS FAMILIA. By tapping I Agree you enter a binding agreement.</p>",
+    "<h4>1. Parties</h4>",
+    "<p>These Terms are a contract between you (“you,” “user”) and the operator of this application, <strong>Hustler Anomalies Enterprises</strong>, together with its owners, officers, employees, contractors, affiliates, successors, licensors, and the individual developer(s) who built or maintain GPS FAMILIA (together, the “Company,” “we,” “us”). GPS FAMILIA is a family location-sharing and messaging product. References to the “Service” mean the website, progressive web app, any wrapped Android/iOS shell, APIs, maps, notifications, and related content.</p>",
+    "<h4>2. Acceptance</h4>",
+    "<p>You must be at least 18 years old (or the age of majority where you live) to accept these Terms. If you use the Service on behalf of a household or organization, you represent that you have authority to bind that group. If you do not agree, you must not create an account, share location, send messages, or otherwise use the Service. Continued use after we post an updated version is acceptance of the new Terms.</p>",
+    "<h4>3. Nature of the Service</h4>",
+    "<p>GPS FAMILIA lets consenting adults share approximate device location with people they place in a “family,” send encrypted messages, post to a community feed, and fire an SOS ping to families they belong to. The Service is a consumer convenience tool. It is <strong>not</strong> a professional monitoring service, not a child-safety product, not medical or legal advice, and not a substitute for 911, law enforcement, or any licensed emergency system.</p>",
+    "<h4>4. GPS, location, and device permissions — read this</h4>",
+    "<p>When you turn Track On (and, on some devices, while the app is in the background), the Service requests access to your device’s location (GPS, Wi-Fi, cell, IP, and similar signals). That location is stored on our servers and on participating devices, shown on a map to members of families you join, written into a location history, and may be included in SOS alerts. Accuracy varies. Batteries drain faster. Maps may be wrong. Location can lag, jump, or fail indoors. You can stop sharing by turning Track Off, revoking OS location permission, or signing out. We do not promise continuous tracking. Other users’ pins appear only if you share a family with them; search never reveals a stranger’s coordinates.</p>",
+    "<p>By agreeing you expressly consent to collection, storage, transmission, and display of your location as described here and in any in-app privacy notes. You understand that anyone in your families can see your live pin and history while tracking is on. You are solely responsible for who you invite.</p>",
+    "<h4>5. Informed consent of every person being located</h4>",
+    "<p><strong>You may not use GPS FAMILIA to locate, follow, or monitor any person who has not given informed, voluntary consent.</strong> Secret tracking, stalking, domestic surveillance of a partner, tracking minors without lawful parental authority and the child’s knowledge where required, workplace monitoring without notice, or any similar conduct is forbidden and may be a crime. You represent that every adult whose location you will view has agreed, and that you will not share another person’s location outside the Service. The Company has no duty to verify consent and is not liable if you or another user violate this rule.</p>",
+    "<h4>6. Prohibited uses</h4>",
+    "<p>You will not: (a) stalk, harass, threaten, or exploit anyone; (b) attempt to bypass family membership, encryption, or access controls; (c) scrape, overload, or reverse engineer the Service; (d) upload malware or illegal content; (e) impersonate others; (f) use the Service in any way that violates law, including export, privacy, wiretap, or voyeurism statutes. We may suspend accounts without notice.</p>",
+    "<h4>7. Not an emergency or safety service</h4>",
+    "<p>SOS is a best-effort message to family devices. It can fail if a phone is off, notifications are blocked, the network is down, or a user never opened the app. <strong>Call 911 (or your local emergency number) in a real emergency.</strong> The Company does not dispatch help, does not watch your map, and does not guarantee delivery, sound, or lock-screen display of any alert.</p>",
+    "<h4>8. Accounts, passwords, and devices</h4>",
+    "<p>You are responsible for your login, OTP codes, Google account, and every device that stays signed in. Notify us if you believe an account is compromised. Demo accounts and sample family members are for trying the product; do not put real secrets in them.</p>",
+    "<h4>9. Messages and user content</h4>",
+    "<p>Direct and family chats are encrypted on the sending device before they are stored. Encryption can fail on old browsers; SOS and some system notices are readable by design. You own content you create and grant the Company a worldwide license to host, transmit, and display it solely to operate the Service. Do not send content you do not have the right to share. We may remove content that appears unlawful.</p>",
+    "<h4>10. Privacy snapshot</h4>",
+    "<p>We process account identifiers (name, email, phone), family membership, messages, posts, device push-subscription endpoints, and location history as needed to run the Service. Push notifications use your browser’s push service (for example Google FCM or Apple). Map tiles come from third parties (OpenStreetMap, Esri, OpenTopoMap). Do not treat the Service as a vault for highly sensitive data.</p>",
+    "<h4>11. Third-party services</h4>",
+    "<p>Google Sign-In, map providers, hosting companies, SMS/email gateways, and browser push vendors are independent. Their outages, terms, and data practices are outside our control. The Company is not liable for third-party acts or omissions.</p>",
+    "<h4>12. Disclaimer of warranties</h4>",
+    "<p>THE SERVICE IS PROVIDED “AS IS” AND “AS AVAILABLE,” WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, QUIET ENJOYMENT, ACCURACY OF LOCATION, UNINTERRUPTED ACCESS, OR NON-INFRINGEMENT. We do not warrant that maps, messages, SOS, or notifications will be timely, complete, or error-free.</p>",
+    "<h4>13. Limitation of liability — Hustler Anomalies Enterprises and associated parties</h4>",
+    "<p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, <strong>HUSTLER ANOMALIES ENTERPRISES, THE DEVELOPER(S), AND ALL ASSOCIATED PARTIES</strong> SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, PUNITIVE, OR PERSONAL-INJURY DAMAGES, OR FOR LOST PROFITS, LOST DATA, LOST LOCATION HISTORY, BUSINESS INTERRUPTION, COST OF SUBSTITUTE SERVICES, OR DAMAGES ARISING FROM: (A) USE OR INABILITY TO USE THE SERVICE; (B) LOCATION THAT IS WRONG, LATE, MISSING, OR SEEN BY SOMEONE YOU DID NOT INTEND; (C) FAILURE OF SOS, CHAT, OR PHONE NOTIFICATIONS; (D) UNAUTHORIZED ACCESS TO AN ACCOUNT; (E) CONDUCT OF OTHER USERS, INCLUDING STALKING OR MISUSE; (F) DEVICE, OS, NETWORK, OR THIRD-PARTY FAILURES. THIS LIMITATION APPLIES IN CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR ANY OTHER THEORY, EVEN IF WE WERE ADVISED OF THE POSSIBILITY OF DAMAGES.</p>",
+    "<p>IF ANY LIABILITY IS NEVERTHELESS IMPOSED, THE TOTAL LIABILITY OF HUSTLER ANOMALIES ENTERPRISES, THE DEVELOPER(S), AND ASSOCIATED PARTIES FOR ALL CLAIMS TOGETHER SHALL NOT EXCEED THE GREATER OF (I) TEN U.S. DOLLARS (US $10.00) OR (II) THE AMOUNT YOU PAID US FOR THE SERVICE IN THE THREE MONTHS BEFORE THE CLAIM (WHICH IS ZERO IF THE SERVICE IS FREE). SOME JURISDICTIONS DO NOT ALLOW CERTAIN LIMITATIONS; IN THOSE PLACES OUR LIABILITY IS LIMITED TO THE FULLEST EXTENT THE LAW ALLOWS. YOU ACKNOWLEDGE THAT LOCATION SHARING AND MESSAGING CARRY INHERENT RISKS AND THAT YOU USE THE SERVICE AT YOUR OWN RISK.</p>",
+    "<h4>14. Release and indemnification</h4>",
+    "<p>You release and will indemnify, defend, and hold harmless Hustler Anomalies Enterprises, the developer(s), and associated parties from any claim, damage, loss, or expense (including reasonable attorneys’ fees) arising out of: your use of the Service; your location sharing; content you send; your violation of these Terms or of law; or any dispute with another user or a third party. We may assume exclusive defense of any matter subject to indemnification.</p>",
+    "<h4>15. Termination</h4>",
+    "<p>You may stop using the Service at any time (Track Off, sign out, delete the site data). We may suspend or terminate access immediately, with or without cause. Sections that by nature should survive (including 5, 12–14, 16–18) survive termination.</p>",
+    "<h4>16. Changes</h4>",
+    "<p>We may modify the Service or these Terms. Material changes may be shown in-app. If you do not agree, stop using the Service. The version you accepted is stored on this device as GPS FAMILIA Terms v1.</p>",
+    "<h4>17. Governing law</h4>",
+    "<p>These Terms are governed by the laws of the State of Colorado, United States, without regard to conflict-of-law rules, except where your local mandatory consumer law says otherwise. Courts located in Colorado shall have exclusive jurisdiction, except that we may seek injunctive relief anywhere.</p>",
+    "<h4>18. Miscellaneous</h4>",
+    "<p>If a provision is unenforceable, the rest remains in effect. These Terms are the entire agreement regarding the Service and supersede prior understandings. Failure to enforce a term is not a waiver. You may not assign these Terms without our consent; we may assign them. Headings are for convenience only. No agency, partnership, or employment is created.</p>",
+    "<h4>19. Contact</h4>",
+    "<p>Questions about these Terms: Hustler Anomalies Enterprises — in-app Help → Terms, or the operator who hosts this copy of GPS FAMILIA. Nothing in this document is legal advice to you; it allocates risk between you and the Company.</p>"
+  ].join("");
+}
+
+function hasAcceptedLegal(){
+  try{
+    const v = JSON.parse(localStorage.getItem(LEGAL_KEY) || "null");
+    return !!(v && v.accepted === true && v.version === LEGAL_VERSION);
+  }catch(e){ return false; }
+}
+function acceptLegal(){
+  localStorage.setItem(LEGAL_KEY, JSON.stringify({ accepted: true, version: LEGAL_VERSION, at: Date.now() }));
+}
+
+function closePopupLayer(layer){
+  if(layer && layer.parentNode) layer.remove();
+}
+
+function showPopup(opts){
+  opts = opts || {};
+  return new Promise(resolve => {
+    const layer = make("div", { className: "popup-layer" + (opts.kind === "legal" ? " legal-layer" : "") });
+    const box = make("div", { className: "popup-box" + (opts.wide ? " wide" : "") + (opts.kind === "legal" ? " legal-box" : "") });
+    if(opts.kicker) box.appendChild(make("div", { className: "popup-kicker" }, opts.kicker));
+    box.appendChild(make("h3", {}, opts.title || "GPS FAMILIA"));
+    const body = make("div", { className: "popup-body" });
+    if(opts.html){
+      const inner = make("div", { className: "legal-scroll" });
+      inner.innerHTML = opts.html;
+      body.appendChild(inner);
+    } else if(opts.node){
+      body.appendChild(opts.node);
+    } else {
+      const p = make("p", { className: "popup-msg" });
+      p.textContent = String(opts.message == null ? "" : opts.message);
+      body.appendChild(p);
+    }
+    box.appendChild(body);
+
+    let input = null;
+    if(opts.kind === "prompt"){
+      input = make("input", { className: "input", placeholder: opts.placeholder || "", value: opts.defaultValue || "" });
+      box.appendChild(input);
+    }
+
+    let check = null;
+    if(opts.requireCheck){
+      const lab = make("label", { className: "legal-check" });
+      check = make("input", { type: "checkbox" });
+      lab.appendChild(check);
+      lab.appendChild(make("span", {}, opts.checkLabel || "I have read and agree."));
+      box.appendChild(lab);
+    }
+
+    const row = make("div", { className: "popup-actions" });
+    let settled = false;
+    function finish(val){
+      if(settled) return;
+      settled = true;
+      document.removeEventListener("keydown", onKey);
+      closePopupLayer(layer);
+      resolve(val);
+    }
+
+    if(opts.kind === "confirm" || opts.kind === "legal" || opts.kind === "prompt"){
+      const no = make("button", { className: "btn secondary", type: "button" }, opts.cancelText || (opts.kind === "prompt" ? "Cancel" : "No"));
+      no.onclick = () => finish(opts.kind === "prompt" ? null : false);
+      row.appendChild(no);
+    }
+    const yes = make("button", { className: "btn", type: "button" }, opts.okText || "OK");
+    yes.onclick = () => {
+      if(check && !check.checked){
+        labPulse(check.parentElement);
+        return;
+      }
+      if(opts.kind === "prompt") finish(input.value);
+      else finish(true);
+    };
+    row.appendChild(yes);
+    box.appendChild(row);
+
+    function onKey(e){
+      if(e.key === "Escape" && opts.kind !== "legal"){
+        e.preventDefault();
+        finish(opts.kind === "prompt" ? null : (opts.kind === "ok" ? true : false));
+      }
+      if(e.key === "Enter" && opts.kind === "prompt" && document.activeElement === input){
+        e.preventDefault();
+        yes.click();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+
+    if(opts.kind !== "legal"){
+      layer.addEventListener("click", (e) => { if(e.target === layer) finish(opts.kind === "prompt" ? null : (opts.kind === "ok" ? true : false)); });
+    }
+    layer.appendChild(box);
+    document.body.appendChild(layer);
+    setTimeout(() => {
+      const f = input || layer.querySelector("button.btn:not(.secondary), input, button");
+      if(f) try{ f.focus(); }catch(e){}
+    }, 40);
+  });
+}
+
+function labPulse(el){
+  if(!el) return;
+  el.classList.remove("need-check");
+  void el.offsetWidth;
+  el.classList.add("need-check");
+}
+
+function notice(message, title){
+  return showPopup({ kind: "ok", message: String(message == null ? "" : message), title: title || "GPS FAMILIA" });
+}
+function ask(message, title){
+  return showPopup({ kind: "confirm", message: String(message == null ? "" : message), title: title || "Confirm", okText: "Yes", cancelText: "No" });
+}
+function askText(message, def){
+  return showPopup({ kind: "prompt", message: String(message == null ? "" : message), title: "Enter", defaultValue: def || "", okText: "Continue", cancelText: "Cancel" });
+}
+
+window.alert = function(msg){ return notice(String(msg == null ? "" : msg)); };
+
+async function showLegalGate(){
+  if(hasAcceptedLegal()) return true;
+  while(true){
+    const ok = await showPopup({
+      kind: "legal",
+      wide: true,
+      title: "Terms of Use & Disclaimer",
+      kicker: "Hustler Anomalies Enterprises",
+      html: legalTermsHtml(),
+      requireCheck: true,
+      checkLabel: "I am 18+, I have read these Terms, and I agree.",
+      okText: "I Agree",
+      cancelText: "I Do Not Agree"
+    });
+    if(ok){
+      acceptLegal();
+      return true;
+    }
+    await notice("You must accept the Terms of Use to use GPS FAMILIA. Without that agreement we cannot provide the service.");
+  }
+}
+function currentSession(){ return storage.get(DB.sessionKey); }
+function setSession(s){
+  storage.set(DB.sessionKey, s);
+  updateUIForSession();
+  updateInboxBadge();
+  updateProfileThumb();
+  if(s && s.sessionToken){ connectRealtime(); syncFromServer(); enablePush(); }
+}
+
+let serverOk = false;
+let socket = null;
+let socketTimer = null;
+let openChatUserId = null;
+let openChatFamilyId = null;
+let serverConfig = { otpEcho: true, googleClientId: "" };
+
+function updateLivePill(){
+  const el = qs("#live-pill");
+  if(!el) return;
+  const on = !!(socket && socket.readyState === 1);
+  el.textContent = on ? "live" : (serverOk ? "online" : "offline");
+  el.classList.toggle("on", on);
+}
+
+async function api(path, opts = {}) {
+  const headers = Object.assign({ "content-type": "application/json" }, opts.headers || {});
+  const s = currentSession();
+  const token = (s && s.sessionToken) || localStorage.getItem("f360_otpsess") || "";
+  if(token) headers["authorization"] = "Bearer " + token;
+  const res = await fetch(path, {
+    method: opts.method || "GET",
+    headers,
+    body: opts.body != null ? JSON.stringify(opts.body) : undefined
+  });
+  const j = await res.json().catch(() => ({}));
+  if(!res.ok){
+    const err = new Error((j && j.error) || res.statusText || "request failed");
+    err.status = res.status;
+    err.body = j;
+    throw err;
+  }
+  serverOk = true;
+  return j;
+}
+async function apiTry(path, opts){
+  try { return await api(path, opts); }
+  catch(e){ if(e && e.status !== 401) serverOk = false; console.warn("api", path, e && e.message); return null; }
+}
+
+function urlBase64ToUint8Array(base64String){
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+async function enablePush(){
+  if(!currentSession() || !currentSession().sessionToken) return;
+  if(!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  try{
+    let perm = Notification.permission;
+    if(perm === "default") perm = await Notification.requestPermission();
+    if(perm !== "granted") return;
+    if(!serverConfig.vapidPublic){
+      const j = await apiTry("/api/config");
+      if(j) serverConfig = Object.assign(serverConfig, j);
+    }
+    const reg = await navigator.serviceWorker.ready;
+    if(serverConfig.vapidPublic){
+      let sub = await reg.pushManager.getSubscription();
+      if(!sub){
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(serverConfig.vapidPublic)
+        });
+      }
+      await apiTry("/api/push/subscribe", { method:"POST", body: { subscription: sub.toJSON() } });
+    }
+  }catch(e){ console.warn("push", e && e.message); }
+}
+
+async function showLocalNotification(n){
+  if(!("Notification" in window) || Notification.permission !== "granted") return;
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification(n.title, {
+      body: n.body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: n.tag || "familia",
+      renotify: true,
+      vibrate: n.kind === "sos" ? [200,80,200,80,400] : [140,70,140],
+      data: { url: n.url || "/" },
+      requireInteraction: n.kind === "sos"
+    });
+  }catch(e){
+    try{ new Notification(n.title, { body: n.body, icon: "/icon-192.png", tag: n.tag }); }catch(e2){}
+  }
+}
+
+function maybeNotifyIncoming(m){
+  if(!m) return;
+  const s = currentSession();
+  if(!s || m.from === s.userId) return;
+  const viewing =
+    (openChatUserId && (m.from === openChatUserId || m.to === openChatUserId) && !m.familyId) ||
+    (openChatFamilyId && m.familyId === openChatFamilyId);
+  if(viewing && !document.hidden) return;
+  const from = getUserById(m.from);
+  const title = m.kind === "sos" ? ("SOS · " + ((from && from.name) || "Family")) : ((from && from.name) || "GPS FAMILIA");
+  const body = m.kind === "sos" ? (m.text || "Emergency alert") : (m.text || "New message");
+  const url = m.familyId ? ("/?family=" + m.familyId) : ("/?chat=" + m.from);
+  const tag = m.familyId ? ("fam-" + m.familyId) : ("chat-" + m.from);
+  showLocalNotification({ title, body, tag, url, kind: m.kind || "chat" });
+}
+
+function openFromNotificationUrl(raw){
+  try{
+    const u = new URL(raw, location.origin);
+    const chat = u.searchParams.get("chat");
+    const fam = u.searchParams.get("family");
+    const post = u.searchParams.get("post");
+    if(chat){ closeModal(); renderMessagesForUser(chat); }
+    else if(fam){ closeModal(); renderFamilyChat(fam); }
+    else if(post){ closeModal(); openFeedPanel({ postId: post }); }
+  }catch(e){}
+}
+
+function connectRealtime(){
+  const s = currentSession();
+  if(!s || !s.sessionToken) return;
+  try{
+    if(socket && (socket.readyState === 0 || socket.readyState === 1)) return;
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${proto}//${location.host}/ws?token=${encodeURIComponent(s.sessionToken)}`);
+    socket = ws;
+    ws.onopen = () => { serverOk = true; updateLivePill(); };
+    ws.onmessage = (ev) => {
+      let msg; try{ msg = JSON.parse(ev.data); }catch(e){ return; }
+      handleRealtime(msg);
+    };
+    ws.onclose = () => {
+      socket = null;
+      updateLivePill();
+      clearTimeout(socketTimer);
+      socketTimer = setTimeout(connectRealtime, 2500);
+    };
+    ws.onerror = () => { try{ ws.close(); }catch(e){} };
+  }catch(e){ console.warn("ws", e); }
+}
+
+function wsSend(obj){
+  if(socket && socket.readyState === 1){
+    try{ socket.send(JSON.stringify(obj)); }catch(e){}
+  }
+}
+
+function handleRealtime(msg){
+  if(!msg || !msg.type) return;
+  if(msg.type === "location"){
+    applyRemoteLocation(msg.userId, msg.lat, msg.lng, msg.ts);
+    } else if(msg.type === "message" && msg.message){
+    upsertServerMessage(msg.message);
+    updateInboxBadge();
+    if(openChatUserId && (msg.message.from === openChatUserId || msg.message.to === openChatUserId)){
+      if(typeof window.__refreshOpenChat === "function") window.__refreshOpenChat();
+    }
+    if(openChatFamilyId && msg.message.familyId === openChatFamilyId){
+      if(typeof window.__refreshOpenChat === "function") window.__refreshOpenChat();
+    }
+    maybeNotifyIncoming(msg.message);
+  } else if(msg.type === "sos" && msg.message){
+    upsertServerMessage(msg.message);
+    updateInboxBadge();
+    if(openChatFamilyId && msg.message.familyId === openChatFamilyId && typeof window.__refreshOpenChat === "function"){
+      window.__refreshOpenChat();
+    }
+    maybeNotifyIncoming(msg.message);
+  } else if(msg.type === "family"){
+    syncFromServer();
+  } else if(msg.type === "typing"){
+    if(openChatUserId === msg.from && typeof window.__showTyping === "function") window.__showTyping();
+  } else if(msg.type === "presence"){
+    const u = getUserById(msg.userId);
+    if(u){ u.online = msg.online; saveUser(u); updateFamilyMarkers(); }
+  } else if(msg.type === "join_request"){
+    updateInboxBadge();
+  } else if(msg.type === "message_deleted" && msg.id){
+    removeLocalMessage(msg.id);
+    if(typeof window.__refreshOpenChat === "function") window.__refreshOpenChat();
+    updateInboxBadge();
+  } else if(msg.type === "profile"){
+    syncFromServer();
+  } else if(msg.type === "feed"){
+    if(typeof window.__refreshFeed === "function") window.__refreshFeed(msg);
+    const s = currentSession();
+    if(msg.action === "new" && msg.post && s && msg.post.authorId !== s.userId){
+      const panel = qs("#feed-panel");
+      const viewing = panel && panel.classList.contains("open") && !document.hidden;
+      if(!viewing){
+        showLocalNotification({
+          title: (msg.post.authorName || "Family") + " posted",
+          body: msg.post.text || "New photo or video in the feed",
+          url: "/?post=" + msg.post.id,
+          tag: "feed-" + msg.post.id,
+          kind: "feed"
+        });
+      }
+    }
+  }
+}
+
+function isFamilyWith(userId){
+  const s = currentSession();
+  if(!s) return false;
+  if(s.userId === userId) return true;
+  const families = storage.get(DB.familiesKey) || [];
+  return families.some(f => Array.isArray(f.members) && f.members.includes(s.userId) && f.members.includes(userId));
+}
+
+function myFamilies(){
+  const s = currentSession();
+  if(!s) return [];
+  return (storage.get(DB.familiesKey) || []).filter(f => Array.isArray(f.members) && f.members.includes(s.userId));
+}
+
+function applyRemoteLocation(userId, lat, lng, ts){
+  const s = currentSession();
+  if(!s) return;
+  if(userId !== s.userId && !isFamilyWith(userId)) return; // never plot non-family
+  let u = getUserById(userId);
+  if(!u){
+    u = { id: userId, name: "Family member", locationHistory: [] };
+  }
+  u.lastLocation = { lat, lng, ts: ts || now() };
+  saveUser(u);
+  updateFamilyMarkers();
+}
+
+function removeLocalMessage(id){
+  if(!id) return;
+  const drop = (key) => {
+    const list = storage.get(key) || [];
+    const next = list.filter(x => x.id !== id);
+    if(next.length !== list.length) storage.set(key, next);
+  };
+  drop(DB.serverMsgsKey);
+  drop(MSG_KEY);
+}
+
+function upsertServerMessage(m){
+  if(!m || !m.id) return;
+  const list = storage.get(DB.serverMsgsKey) || [];
+  if(!list.find(x => x.id === m.id)){
+    list.push(m);
+    storage.set(DB.serverMsgsKey, list);
+  }
+  // also mirror into local encrypted store if enc present
+  if(m.enc){
+    const local = storage.get(MSG_KEY) || [];
+    if(!local.find(x => x.id === m.id)){
+      local.push({ id: m.id, from: m.from, to: m.to, enc: m.enc, ts: m.ts });
+      storage.set(MSG_KEY, local);
+    }
+  }
+}
+
+function cacheUserFromServer(su){
+  if(!su || !su.id) return;
+  const users = storage.get(DB.usersKey) || [];
+  const i = users.findIndex(x => x.id === su.id);
+  const prev = i >= 0 ? users[i] : {};
+  const merged = Object.assign({}, prev, {
+    id: su.id,
+    name: su.name || prev.name,
+    email: su.email != null ? su.email : prev.email,
+    phone: su.phone != null ? su.phone : prev.phone,
+    online: su.online,
+    inFamily: su.inFamily
+  });
+  if(su.lastLocation) merged.lastLocation = su.lastLocation;
+  else if(!isFamilyWith(su.id) && currentSession()?.userId !== su.id){
+    delete merged.lastLocation;
+    delete merged.locationHistory;
+  }
+  if(su.appearOnMap === false && currentSession()?.userId !== su.id){
+    delete merged.lastLocation;
+  }
+  if(su.locationHistory) merged.locationHistory = su.locationHistory;
+  if(su.prefs) merged.prefs = su.prefs;
+  if(su.appearOnMap != null) merged.appearOnMap = su.appearOnMap;
+  if(su.profileImage) saveProfileImageForUser(su.id, su.profileImage);
+  if(i >= 0) users[i] = merged; else users.push(merged);
+  storage.set(DB.usersKey, users);
+}
+
+function cacheFamily(f){
+  if(!f || !f.id) return;
+  const families = storage.get(DB.familiesKey) || [];
+  const i = families.findIndex(x => x.id === f.id);
+  if(i >= 0) families[i] = Object.assign({}, families[i], f);
+  else families.push(f);
+  storage.set(DB.familiesKey, families);
+}
+
+async function syncFromServer(){
+  const j = await apiTry("/api/sync");
+  if(!j) return;
+  const s = currentSession();
+  const allowed = new Set((j.users || []).map(u => u.id));
+  (j.users || []).forEach(cacheUserFromServer);
+  let users = storage.get(DB.usersKey) || [];
+  users = users.map(u => {
+    if(s && u.id === s.userId) return u;
+    if(!allowed.has(u.id) && u.lastLocation){
+      const copy = Object.assign({}, u);
+      delete copy.lastLocation;
+      delete copy.locationHistory;
+      return copy;
+    }
+    return u;
+  });
+  storage.set(DB.usersKey, users);
+  (j.families || []).forEach(cacheFamily);
+  if(j.messages) storage.set(DB.serverMsgsKey, j.messages);
+  if(j.places) { storage.set(DB.placesKey, j.places); renderSavedPlacesToMap(); }
+  updateFamilyMarkers();
+  updateInboxBadge();
+  updateProfileThumb();
+}
+
+async function sendOtp(phone, email){
+  try{
+    const res = await fetch("/api/send-otp", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ phone, email }) });
+    const j = await res.json();
+    if(!res.ok) { await notice("Failed to send OTP: " + (j && j.error)); return null; }
+    if(j && j.otp){
+      await notice("OTP (local/dev): " + j.otp);
+    } else {
+      await notice("OTP sent (via configured channel). Check your phone or email.");
+    }
+    return j;
+  }catch(e){ console.error(e); await notice("OTP send failed"); return null; }
+}
+async function verifyOtp(phone, code){
+  try{
+    const res = await fetch("/api/verify-otp", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ phone, code }) });
+    const j = await res.json();
+    if(!res.ok) { await notice("OTP verification failed: " + (j && j.error)); return null; }
+    if(j && j.sessionToken) localStorage.setItem("f360_otpsess", j.sessionToken);
+    if(j && j.user){
+      cacheUserFromServer(j.user);
+      setSession({ userId: j.user.id, sessionToken: j.sessionToken });
+    }
+    return j;
+  }catch(e){ console.error(e); return null; }
+}
+
+function showModal(contentEl, opts={}){
+  const backdrop = make("div",{className:"modal-backdrop", id: uid("modal")});
+  const modal = make("div",{className:"modal"});
+  if(opts.variant === "chat") modal.classList.add("chat-shell");
+  if(opts.variant === "help") modal.classList.add("help-shell");
+  if(opts.variant === "feed") modal.classList.add("feed-shell");
+
+  const closeBtn = make("button",{className:"modal-close", type:"button", title:"Close"});
+  closeBtn.innerHTML = "✕";
+  closeBtn.onclick = () => { closeModal(); };
+
+  modal.appendChild(closeBtn);
+  modal.appendChild(contentEl);
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+
+  setTimeout(()=>{ const firstInput = modal.querySelector("input,button,select,textarea"); if(firstInput) firstInput.focus(); }, 40);
+  setTimeout(()=>{ try{ if(window.reflowMap) window.reflowMap(); }catch(e){} }, 50);
+  return backdrop;
+}
+function closeModal(){
+  openChatUserId = null;
+  openChatFamilyId = null;
+  window.__refreshOpenChat = null;
+  window.__showTyping = null;
+  const m = document.querySelector(".modal-backdrop");
+  if(m) m.remove();
+}
+
+function loadGsi(cb){
+  if(window.google && google.accounts && google.accounts.id){ cb(); return; }
+  const started = Date.now();
+  const t = setInterval(() => {
+    if(window.google && google.accounts && google.accounts.id){ clearInterval(t); cb(); }
+    else if(Date.now() - started > 8000){ clearInterval(t); cb(new Error("Google script did not load")); }
+  }, 150);
+}
+
+async function onGoogleCredential(resp){
+  try{
+    const j = await api("/api/auth/google", { method:"POST", body: { credential: resp.credential } });
+    cacheUserFromServer(j.user);
+    if(j.user && j.user.googlePicture && !getProfileImageForUser(j.user.id)){
+      saveProfileImageForUser(j.user.id, j.user.googlePicture);
+    }
+    setSession({ userId: j.user.id, sessionToken: j.sessionToken });
+    closeModal();
+    updateUIForSession();
+  }catch(e){
+    notice("Google sign-in failed: " + (e.message || "unknown error"));
+  }
+}
+
+async function mountGoogleButton(slot){
+  if(!slot) return;
+  slot.innerHTML = "";
+  if(!serverConfig.googleClientId){
+    const j = await apiTry("/api/config");
+    if(j) serverConfig = Object.assign(serverConfig, j);
+  }
+  const cid = serverConfig.googleClientId;
+  if(!cid){
+    const btn = make("button",{className:"google-btn", type:"button"});
+    btn.innerHTML = `<span class="gico">G</span> Continue with Google`;
+    btn.onclick = async () => {
+      if(serverConfig.demo){
+        const r = await apiTry("/api/auth/demo-google", { method:"POST", body: {} });
+        if(!r || !r.user) return notice("Google sign-in is not on yet. Use email or a sample family member.");
+        cacheUserFromServer(r.user);
+        setSession({ userId: r.user.id, sessionToken: r.sessionToken });
+        closeModal();
+        updateUIForSession();
+        return;
+      }
+      notice("Google sign-in is not on yet. Use email, phone, or a sample family member.");
+    };
+    slot.appendChild(btn);
+    slot.appendChild(make("div",{className:"small-muted", style:"margin-top:6px;text-align:center"}, "Or pick a sample family member below."));
+    return;
+  }
+  loadGsi((err) => {
+    if(err || !window.google){
+      const btn = make("button",{className:"google-btn", type:"button"}, "Continue with Google");
+      btn.onclick = () => notice("Google script blocked. Allow accounts.google.com and retry.");
+      slot.appendChild(btn);
+      return;
+    }
+    try{
+      google.accounts.id.initialize({ client_id: cid, callback: onGoogleCredential, ux_mode: "popup" });
+      google.accounts.id.renderButton(slot, { theme: "outline", size: "large", width: 336, text: "continue_with", shape: "rectangular" });
+    }catch(e){
+      const btn = make("button",{className:"google-btn", type:"button"}, "Continue with Google");
+      btn.onclick = () => { try{ google.accounts.id.prompt(); }catch(err2){ notice(err2.message); } };
+      slot.appendChild(btn);
+    }
+  });
+}
+
+async function sendSos(){
+  const s = currentSession();
+  if(!s) return notice("Sign in first");
+  if(!myFamilies().length) return notice("Join or create a family first. SOS is sent to every family you belong to.");
+  if(!await ask("Send an SOS alert to every family you belong to?")) return;
+  const j = await apiTry("/api/sos", { method:"POST", body: {} });
+  if(j && j.ok) notice("SOS sent to " + j.families + " family(ies). They will see it in chat and inbox.");
+  else notice((j && j.error) || "Could not send SOS.");
+}
+
+function renderHelp(startTab){
+  const wrap = make("div",{className:"help-app"});
+  const nav = make("div",{className:"help-nav"});
+  nav.appendChild(make("h2",{}, "FAMILIA"));
+  const body = make("div",{className:"help-body"});
+  const tabs = [
+    { id:"welcome", label:"Welcome" },
+    { id:"start", label:"Getting started" },
+    { id:"map", label:"The map" },
+    { id:"families", label:"Families" },
+    { id:"privacy", label:"Privacy" },
+    { id:"messages", label:"Messages" },
+    { id:"alerts", label:"Phone alerts" },
+    { id:"search", label:"Find people" },
+    { id:"tracking", label:"Tracking" },
+    { id:"community", label:"Community" },
+    { id:"roles", label:"Family roles" },
+    { id:"terms", label:"Terms" },
+    { id:"faq", label:"FAQ" }
+  ];
+  const pages = {
+    welcome: () => {
+      const d = make("div");
+      d.append(
+        make("div",{className:"help-kicker"}, "GPS FAMILIA"),
+        make("h3",{}, "Family. Loyalty. Location."),
+        make("p",{}, "A private family locator and messenger. Sign in, join as many families as you want, and only people who share a family with you can ever see your pin on the map."),
+        make("div",{className:"help-callout"}, "People you find by name or phone can be messaged and invited — they never appear on the map until they join one of your families."),
+        make("h4",{}, "The bar at the top"),
+        make("ul",{},
+          make("li",{}, "☰ GPS FAMILIA — account menu (profile, password, privacy, theme, sign in/out)"),
+          make("li",{}, "Track — share or hide your live location"),
+          make("li",{}, "SOS — emergency ping to every family you are in"),
+          make("li",{}, "Feed — community posts"),
+          make("li",{}, "🔍 — find people · ✉️ inbox · 👥 family members · ? help")
+        ),
+        make("p",{}, "On the map, + / − zoom, ↻ refreshes family pins, ◎ centers on you, ✕ hides a mapped trail. Tap a name or pin to zoom in. Open ☰ → Location history & trail to map the path recorded every minute while Track is On.")
+      );
+      return d;
+    },
+    start: () => {
+      const d = make("div");
+      d.append(make("div",{className:"help-kicker"}, "First hour"), make("h3",{}, "Getting started"));
+      const steps = [
+        ["Sign in", "Create an account, use Google if it is offered, or tap a sample family member on the login screen."],
+        ["Allow location", "A consent notice appears. Accept only if everyone being shared with has agreed."],
+        ["Turn Track On", "Your pin appears for family. The footer says live when you are connected."],
+        ["Allow phone alerts", "When your phone asks, tap Allow so messages show on the lock screen like a normal text."],
+        ["Create a family", "＋ Create / Join. Private (invite only) or Public (searchable). You can belong to many."],
+        ["Invite", "Share the QR, link, WhatsApp, or SMS. They open it, sign in, and join — they keep any families they already have."],
+        ["Message", "Drawer → 💬 next to a member, or 🔍 someone new. Yours are teal on the right; theirs are gray on the left."]
+      ];
+      steps.forEach((s,i) => {
+        const row = make("div",{className:"help-step"});
+        row.append(make("div",{className:"help-num"}, String(i+1)), make("div",{}, make("div",{style:"font-weight:700"}, s[0]), make("div",{className:"small-muted"}, s[1])));
+        d.appendChild(row);
+      });
+      return d;
+    },
+    map: () => {
+      const d = make("div");
+      d.append(
+        make("h3",{}, "The map"),
+        make("p",{}, "Street, satellite, and terrain layers — switch them with the buttons on the right."),
+        make("ul",{},
+          make("li",{}, "Pins are family members who have Track On. Tap a pin for history or Map trail."),
+          make("li",{}, "📌 saves a named place (home, school, work) at the current map center."),
+          make("li",{}, "+ / − zoom. ↻ refreshes pins. ◎ centers on you. ✕ hides the trail line."),
+          make("li",{}, "People outside your families never show, even if they exist in search.")
+        )
+      );
+      return d;
+    },
+    families: () => {
+      const d = make("div");
+      d.append(
+        make("h3",{}, "Families — you can join many"),
+        make("p",{}, "A family is a consent circle. Location is shared with everyone who is in a family with you. Joining another crew never removes you from the first."),
+        make("ul",{},
+          make("li",{}, "Private — join with an invite, QR, link, or family password."),
+          make("li",{}, "Public — anyone can find it in search and join (still no location until they are a member)."),
+          make("li",{}, "Family chat — a private room for the whole crew."),
+          make("li",{}, "SOS — one tap alerts every family you are in.")
+        ),
+        make("div",{className:"help-callout"}, "The Head of a private family without a password must accept join requests before location starts flowing.")
+      );
+      return d;
+    },
+    privacy: () => {
+      const d = make("div");
+      d.append(
+        make("h3",{}, "Privacy"),
+        make("ul",{},
+          make("li",{}, "Search never shows someone else's location."),
+          make("li",{}, "The map only lists people who share a family with you."),
+          make("li",{}, "Guests can be in the family without appearing on the map."),
+          make("li",{}, "Track Off stops sharing. Sign out ends the session."),
+          make("li",{}, "Record my trail — while Track is On, a pin is saved every minute. Turn this off in Privacy if you only want a live pin."),
+          make("li",{}, "Allow family to view my location history — they can map your trail only if this stays on.")
+        ),
+        make("div",{className:"help-warn"}, "Only use this with informed consent. Do not track anyone who has not agreed.")
+      );
+      return d;
+    },
+    messages: () => {
+      const d = make("div");
+      d.append(
+        make("h3",{}, "Messages"),
+        make("p",{}, "Direct chats and family rooms are sealed on your device before they are sent. A padlock badge marks a private thread."),
+        make("ul",{},
+          make("li",{}, "Your bubbles: right, teal. Theirs: left, gray."),
+          make("li",{}, "Enter sends. Shift+Enter makes a new line. 📎 attaches a photo."),
+          make("li",{}, "Right-click (or long-press on a phone) a bubble to copy or delete it."),
+          make("li",{}, "When the app is closed, new messages still ring on your phone like a text."),
+          make("li",{}, "SOS alerts are readable on every family device on purpose.")
+        )
+      );
+      return d;
+    },
+    alerts: () => {
+      const d = make("div");
+      d.append(
+        make("div",{className:"help-kicker"}, "Lock screen"),
+        make("h3",{}, "Phone alerts"),
+        make("p",{}, "Family messages and SOS alerts appear in your phone's notification shade — the same place texts and iMessage live — even if GPS FAMILIA is in the background."),
+        make("ul",{},
+          make("li",{}, "After you sign in, tap Allow when the phone asks to send notifications."),
+          make("li",{}, "On iPhone, add this site to the Home Screen (Safari → Share → Add to Home Screen) so alerts keep working."),
+          make("li",{}, "Tap a notification to jump straight into that chat."),
+          make("li",{}, "If you are already looking at that conversation, we stay quiet so it does not double-ding.")
+        ),
+        make("div",{className:"help-callout"}, "If alerts stopped, open the app once while signed in. Your phone will re-link.")
+      );
+      const btn = make("button",{className:"btn", type:"button"}, "Turn on phone alerts");
+      btn.onclick = () => { enablePush().then(() => notice("Alerts are on. You will see family messages on this device.")); };
+      d.appendChild(make("div",{className:"row", style:"margin-top:12px"}, btn));
+      return d;
+    },
+    search: () => {
+      const d = make("div");
+      d.append(
+        make("h3",{}, "Find people"),
+        make("p",{}, "🔍 or the drawer search. Type a name or a phone number. Hits come from the live family directory."),
+        make("p",{}, "From a result you can Message or Invite them. On map only appears if they already share a family with you.")
+      );
+      return d;
+    },
+    tracking: () => {
+      const d = make("div");
+      d.append(
+        make("h3",{}, "Tracking"),
+        make("p",{}, "Track On uses your phone's GPS and updates family devices within a second or two. The footer pill turns teal when you are live."),
+        make("p",{}, "While Track is On, GPS FAMILIA also records a trail pin every minute (not on every GPS tick). Open ☰ → Location history & trail — or tap a family pin → History / Map trail."),
+        make("ul",{},
+          make("li",{}, "Map this trail — draws the path on the map with start and end markers."),
+          make("li",{}, "Time range — last hour, today, 24 hours, 7 days, or all."),
+          make("li",{}, "Hide trail — clears the line from the map (history stays)."),
+          make("li",{}, "Save pin now — drop a point immediately."),
+          make("li",{}, "Clear this range / Clear all history — erases recorded points. Cannot be undone."),
+          make("li",{}, "Privacy → Record my trail — turn recording off and keep only the live pin.")
+        ),
+        make("p",{}, "If location is blocked, a nearby demo pin is used so the map still works on a desktop.")
+      );
+      return d;
+    },
+    community: () => {
+      const d = make("div");
+      d.append(
+        make("div",{className:"help-kicker"}, "Feed"),
+        make("h3",{}, "Community"),
+        make("p",{}, "Tap Feed in the top bar. A panel slides in from the right — the map stays open beside it. Choose Everyone or a family before you post. Family posts stay inside that crew."),
+        make("ul",{},
+          make("li",{}, "🖼 Photo and ▶ Video — add pictures or a short clip to a post"),
+          make("li",{}, "♡ Like, 💬 Comment, ↗ Share — like Facebook, inside the app"),
+          make("li",{}, "Share copies a link, posts it to your own feed, or uses the phone share sheet"),
+          make("li",{}, "Search filters posts as you type"),
+          make("li",{}, "Your own posts can be deleted with ⋯")
+        ),
+        make("div",{className:"help-callout"}, "Videos are stored as files (not inside the database). Keep clips around 12 MB or smaller.")
+      );
+      return d;
+    },
+    roles: () => {
+      const d = make("div");
+      d.append(
+        make("div",{className:"help-kicker"}, "Advanced"),
+        make("h3",{}, "Family roles"),
+        make("p",{}, "Only the Head of Family can appoint Admins and hand over the house. Open Your Families → Settings (or ⚙ in the drawer)."),
+        make("ul",{},
+          make("li",{}, "Head of Family — full control, including transfer."),
+          make("li",{}, "Admin — accept joins, remove members, edit the family name."),
+          make("li",{}, "Consigliere — can create custom roles."),
+          make("li",{}, "Member — invite, chat, location."),
+          make("li",{}, "Guest — in the family, off the map.")
+        )
+      );
+      return d;
+    },
+    terms: () => {
+      const d = make("div");
+      d.append(
+        make("div",{className:"help-kicker"}, "Legal"),
+        make("h3",{}, "Terms of Use")
+      );
+      d.appendChild(make("p",{className:"small-muted"}, "The agreement you accepted on first launch. Hustler Anomalies Enterprises, the developer, and associated parties provide GPS FAMILIA as-is."));
+      const box = make("div",{className:"legal-scroll"});
+      box.innerHTML = legalTermsHtml();
+      d.appendChild(box);
+      return d;
+    },
+    faq: () => {
+      const d = make("div");
+      d.append(
+        make("h3",{}, "FAQ"),
+        make("h4",{}, "Why don't I see Continue with Google?"),
+        make("p",{}, "Whoever put the app online has not turned Google sign-in on yet. Use email, a sample family member, or ask them."),
+        make("h4",{}, "Why don't I see someone on the map?"),
+        make("p",{}, "They are not in one of your families, they have Track Off, they are a Guest, or they have not accepted location."),
+        make("h4",{}, "Can I be in two families?"),
+        make("p",{}, "Yes. Unlimited. Location is visible to the combined membership."),
+        make("h4",{}, "Are chats private?"),
+        make("p",{}, "Yes. Messages are sealed on your device. SOS is the exception so every family phone can read an emergency."),
+        make("h4",{}, "Where is my trail?"),
+        make("p",{}, "Open ☰ → Location history & trail, or tap a family pin → Map trail. A point is stored every minute while Track is On. Sample family members already have a short demo path you can map."),
+        make("h4",{}, "I am just trying it out"),
+        make("p",{}, "On the login screen, tap any sample family member. Password for all of them is demo123. Phone code is 000000.")
+      );
+      return d;
+    }
+  };
+
+  function show(id){
+    nav.querySelectorAll(".help-tab").forEach(b => b.classList.toggle("active", b.dataset.id === id));
+    body.innerHTML = "";
+    const fn = pages[id] || pages.welcome;
+    body.appendChild(fn());
+  }
+  tabs.forEach(t => {
+    const b = make("button",{className:"help-tab", type:"button"});
+    b.dataset.id = t.id;
+    b.textContent = t.label;
+    b.onclick = () => show(t.id);
+    nav.appendChild(b);
+  });
+  wrap.append(nav, body);
+  showModal(wrap, { variant: "help" });
+  const modal = document.querySelector(".modal");
+  if(modal) modal.classList.add("help-shell");
+  show(startTab && pages[startTab] ? startTab : "welcome");
+}
+
+function renderAuth(){
+  const container = make("div");
+  const tabs = make("div",{className:"row", style:"gap:12px;margin-bottom:12px"});
+  const tabLogin = make("button",{className:"btn small secondary", type:"button"}, "Log in");
+  const tabReg = make("button",{className:"btn small", type:"button"}, "Register");
+  tabs.appendChild(tabLogin); tabs.appendChild(tabReg);
+
+  const formWrap = make("div");
+  container.appendChild(tabs);
+  container.appendChild(formWrap);
+
+  function renderLogin(){
+    formWrap.innerHTML = "";
+    const gslot = make("div",{id:"google-btn-slot"});
+    formWrap.appendChild(gslot);
+    formWrap.appendChild(make("div",{className:"auth-divider"}, "or use your account"));
+    mountGoogleButton(gslot);
+    const idInput = make("input",{className:"input", placeholder:"username, email, or phone", id:"login-id"});
+    const pass = make("input",{className:"input", type:"password", id:"login-pass"});
+    const phone = make("input",{className:"input", placeholder:"Phone (optional)", id:"login-phone"});
+    const row = make("div",{className:"form-row col"});
+    row.append(make("label",{}, "Username, Email, or Phone"), idInput, make("label",{}, "Password"), pass, phone);
+    const submit = make("button",{className:"btn", type:"button"}, "Log in");
+    const forgot = make("button",{className:"btn small secondary", type:"button"}, "Demo OTP login");
+    submit.onclick = async () => {
+      const identifier = (idInput.value || "").trim();
+      try{
+        const j = await api("/api/login", { method:"POST", body: { identifier, password: pass.value } });
+        cacheUserFromServer(j.user);
+        setSession({ userId: j.user.id, sessionToken: j.sessionToken });
+        closeModal();
+        updateUIForSession();
+        return;
+      }catch(e){
+        if(identifier && pass.value){
+          const usersLocal = storage.get(DB.usersKey) || [];
+          const localUser = usersLocal.find(x => (x.email && x.email.toLowerCase() === identifier.toLowerCase())
+                                              || (x.name && x.name.toLowerCase() === identifier.toLowerCase())
+                                              || (x.phone && (x.phone === identifier || digits(x.phone) === digits(identifier))));
+          if(localUser){
+            if(localUser.password !== undefined && localUser.password !== pass.value){
+              notice("Login failed: bad password");
+              return;
+            }
+            setSession({ userId: localUser.id, sessionToken: uid("tok") });
+            closeModal();
+            updateUIForSession();
+            return;
+          }
+        }
+        notice("Login failed: " + (e && e.message || "invalid"));
+      }
+    };
+    forgot.onclick = async () => {
+      if(!phone.value){ notice("Enter phone to receive OTP"); return; }
+      await sendOtp(phone.value);
+      const otp = await askText("Enter the OTP you received");
+      if(otp == null || String(otp).trim() === "") return;
+      const ok = await verifyOtp(phone.value, otp);
+      if(!ok){ notice("Bad OTP"); return; }
+      if(ok.user){ closeModal(); updateUIForSession(); return; }
+      const usersLocal = storage.get(DB.usersKey) || [];
+      let u = usersLocal.find(x=>x.phone === phone.value);
+      if(!u){
+        const name = "User "+phone.value.slice(-4);
+        try{
+          const res = await fetch("/api/register", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ name, email: name.replace(/\s/g,"")+"@local.familia", phone: phone.value, password: "otp-"+phone.value.slice(-6) }) });
+          const j = await res.json();
+          if(res.ok && j.user){
+            usersLocal.push({ id: j.user.id, name: j.user.name || name, email: (j.user.email||"").toLowerCase(), phone: phone.value, createdAt: now(), locationHistory: [] });
+            storage.set(DB.usersKey, usersLocal);
+            setSession({ userId: j.user.id, sessionToken: j.sessionToken }); closeModal();
+            updateUIForSession();
+            return;
+          }
+        }catch(e){ console.warn("auto-register failed", e); }
+        u = { id: uid("u"), name: name, email: "", phone: phone.value, password: "" };
+        usersLocal.push(u); storage.set(DB.usersKey, usersLocal);
+      }
+      setSession({ userId: u.id });
+      closeModal();
+    };
+
+    const profileHint = make("div",{className:"small-muted", style:"margin-top:8px"}, "After signing in you can upload a profile photo via the top-right avatar.");
+    formWrap.appendChild(row);
+    formWrap.appendChild(make("div",{className:"row", style:"gap:8px;margin-top:10px"}, submit, forgot));
+    formWrap.appendChild(profileHint);
+    mountDemoPanel(uiBag(), formWrap).catch(()=>{});
+  }
+
+  function renderRegister(){
+    formWrap.innerHTML = "";
+    const gslot = make("div",{id:"google-btn-slot-reg"});
+    formWrap.appendChild(gslot);
+    formWrap.appendChild(make("div",{className:"auth-divider"}, "or create an account"));
+    mountGoogleButton(gslot);
+    const name = make("input",{className:"input", placeholder:"Full name", id:"reg-name"});
+    const email = make("input",{className:"input", placeholder:"Email", id:"reg-email"});
+    const phone = make("input",{className:"input", placeholder:"Phone number", id:"reg-phone"});
+    const pass = make("input",{className:"input", type:"password", placeholder:"Password (min 6 chars)", id:"reg-pass"});
+    const pass2 = make("input",{className:"input", type:"password", placeholder:"Verify password", id:"reg-pass2"});
+    const row = make("div",{className:"form-row col"});
+    row.append(make("label",{}, "Name"), name, make("label",{}, "Email"), email, make("label",{}, "Phone"), phone, make("label",{}, "Password"), pass, make("label",{}, "Verify Password"), pass2);
+
+    const feedback = make("div",{className:"small-muted", style:"min-height:18px;margin-top:6px;"},"");
+
+    const sendOtpBtn = make("button",{className:"btn small secondary", type:"button"}, "Send OTP to phone");
+    sendOtpBtn.onclick = async () => {
+      if(!phone.value) return notice("Enter phone");
+      const ok = await sendOtp(phone.value, email.value);
+      if(!ok) return;
+      const code = await askText("Enter OTP");
+      if(code == null || String(code).trim() === "") return;
+      const verified = await verifyOtp(phone.value, code);
+      if(!verified) return notice("Bad OTP");
+      notice("Phone verified");
+      feedback.textContent = "Phone verified ✔️";
+    };
+
+    const submit = make("button",{className:"btn", type:"button"}, "Register");
+    submit.onclick = async () => {
+      feedback.textContent = "";
+      if(!name.value.trim()) return feedback.textContent = "Please enter your full name.";
+      const em = (email.value || "").trim();
+      if(!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return feedback.textContent = "Please enter a valid email address.";
+      if((pass.value || "").length < 6) return feedback.textContent = "Password must be at least 6 characters.";
+      if(pass.value !== pass2.value) return feedback.textContent = "Passwords do not match.";
+
+      submit.disabled = true;
+      submit.textContent = "Registering...";
+
+      const nameTxt = name.value.trim();
+      const phoneTxt = (phone.value || "").trim();
+
+      try{
+        const j = await api("/api/register", { method:"POST", body: { name: nameTxt, email: em, phone: phoneTxt, password: pass.value } });
+        const localUser = { id: j.user.id, name: j.user.name || nameTxt, email: em, phone: phoneTxt, createdAt: now(), locationHistory: [] };
+        let usersLocal = storage.get(DB.usersKey) || [];
+        if(!usersLocal.find(u => u.id === localUser.id)) usersLocal.push(localUser);
+        storage.set(DB.usersKey, usersLocal);
+        setSession({ userId: localUser.id, sessionToken: j.sessionToken });
+        closeModal();
+        notice("Registration complete — welcome " + (localUser.name || localUser.email));
+        submit.disabled = false;
+        submit.textContent = "Register";
+        return;
+      }catch(e){
+        if(e.status === 409){
+          feedback.textContent = e.message === "email used" ? "An account with that email already exists. Log in instead." :
+            e.message === "username taken" ? "That username is already taken." : e.message;
+          submit.disabled = false; submit.textContent = "Register"; return;
+        }
+      }
+
+      let usersLocal = storage.get(DB.usersKey) || [];
+      if(usersLocal.find(u => u.email && u.email.toLowerCase() === em.toLowerCase())) {
+        feedback.textContent = "An account with that email already exists. Log in instead.";
+        submit.disabled = false; submit.textContent = "Register"; return;
+      }
+      if(usersLocal.find(u => u.name && u.name.toLowerCase() === nameTxt.toLowerCase())) {
+        feedback.textContent = "That username is already taken.";
+        submit.disabled = false; submit.textContent = "Register"; return;
+      }
+
+      const localUser = { id: uid("u"), name: nameTxt, email: em, phone: phoneTxt, password: pass.value, createdAt: now(), locationHistory: [] };
+      usersLocal.push(localUser);
+      storage.set(DB.usersKey, usersLocal);
+      setSession({ userId: localUser.id, sessionToken: uid("tok") });
+      closeModal();
+      notice("Registration complete — welcome " + (localUser.name || localUser.email));
+      submit.disabled = false;
+      submit.textContent = "Register";
+    };
+
+    formWrap.appendChild(row);
+    formWrap.appendChild(feedback);
+    formWrap.appendChild(make("div",{className:"row", style:"gap:8px;margin-top:10px"}, sendOtpBtn, submit));
+  }
+
+  tabLogin.onclick = () => { tabLogin.classList.remove("secondary"); tabReg.classList.add("secondary"); renderLogin(); };
+  tabReg.onclick = () => { tabReg.classList.remove("secondary"); tabLogin.classList.add("secondary"); renderRegister(); };
+
+  tabLogin.click();
+
+  return showModal(container);
+}
+
+async function renderDisclaimer(onAccept){
+  const ok = await showPopup({
+    kind: "confirm",
+    wide: true,
+    title: "Enable location sharing",
+    kicker: "GPS consent",
+    message: "GPS FAMILIA will use this device’s location (GPS, Wi-Fi, and network) while Track is On. Your pin and history are visible to every family you belong to. This is not 911. Only continue if every person whose location will be viewed has given informed consent. You can turn Track Off at any time. Full terms: Help → Terms.",
+    okText: "Enable GPS",
+    cancelText: "Not now"
+  });
+  if(ok && onAccept) onAccept();
+}
+
+function renderCreateJoin(prefillInvite){
+  const wrap = make("div");
+  wrap.appendChild(make("h3",{}, "Create or Join a Family"));
+  wrap.appendChild(make("div",{className:"privacy-note", style:"margin:-4px 0 12px"}, "You can belong to as many families as you want. Joining another family never removes you from the ones you already have. Location is only shared with people who are in a family with you."));
+  const name = make("input",{className:"input", placeholder:"Family name"});
+  const pass = make("input",{className:"input", placeholder:"Family password (optional)"});
+  const privacy = make("select",{className:"input"}, make("option",{value:"private"},"Private"), make("option",{value:"public"},"Public"));
+  const createBtn = make("button",{className:"btn"}, "Create Family");
+
+  createBtn.onclick = async () => {
+    const s = currentSession(); if(!s){ notice("Sign in first"); return; }
+    const payload = { name: name.value, password: pass.value, privacy: privacy.value };
+    const j = await apiTry("/api/families", { method:"POST", body: payload });
+    if(j && j.family){
+      cacheFamily(j.family);
+      closeModal();
+      openShareModal(j.family);
+      updateFamilyMarkers();
+      return;
+    }
+    const families = storage.get(DB.familiesKey) || [];
+    const f = { id: uid("f"), name: name.value || ("Family "+Math.random().toString(36).slice(2,6)), password: pass.value||"", privacy: privacy.value, members: [s.userId], invites: [], createdAt: now(), ownerId: s.userId };
+    families.push(f); storage.set(DB.familiesKey, families);
+    const token = btoa(JSON.stringify({fid:f.id, ts: now()}));
+    f.invites.push(token); storage.set(DB.familiesKey, families);
+    closeModal();
+    openShareModal(f);
+    updateFamilyMarkers();
+  };
+
+  const invite = make("input",{className:"input", placeholder:"Paste invite token"});
+  if(prefillInvite) invite.value = prefillInvite;
+
+  const joinBtn = make("button",{className:"btn secondary"}, "Join Family");
+  joinBtn.onclick = async () => {
+    const s = currentSession(); if(!s){ notice("Sign in first"); return; }
+    const token = invite.value.trim();
+    const j = await apiTry("/api/families/join", { method:"POST", body: { token } });
+    if(j && j.family){
+      cacheFamily(j.family);
+      notice("Joined family " + j.family.name + " (you can stay in your other families too).");
+      closeModal();
+      updateFamilyMarkers();
+      return;
+    }
+    const families = storage.get(DB.familiesKey) || [];
+    try{
+      const decoded = JSON.parse(atob(token));
+      const f = families.find(x=>x.id === decoded.fid);
+      if(!f) return notice("Invite invalid");
+      if(!f.invites.includes(token)) return notice("Invite expired/invalid");
+      if(!f.members.includes(s.userId)) f.members.push(s.userId);
+      storage.set(DB.familiesKey, families);
+      notice("Joined family " + f.name);
+      closeModal();
+      updateFamilyMarkers();
+    }catch(e){ notice("Bad token"); }
+  };
+
+  wrap.appendChild(make("div",{className:"form-row col"}, make("label",{}, "Create new family"), name, pass, privacy, createBtn));
+  wrap.appendChild(make("hr",{}));
+  wrap.appendChild(make("div",{className:"form-row col"}, make("label",{}, "Join with invite token"), invite, joinBtn));
+
+  return showModal(wrap);
+}
+
+function familyInvite(f){
+  const families = storage.get(DB.familiesKey) || [];
+  const ff = families.find(x=>x.id===f.id) || f;
+  let token = ff.invites && ff.invites[0];
+  if(!token){
+    token = btoa(JSON.stringify({fid: ff.id, ts: now()}));
+    if(!ff.invites) ff.invites = [];
+    if(!ff.invites.includes(token)) ff.invites.push(token);
+    storage.set(DB.familiesKey, families);
+  }
+  const origin = window.location.origin + window.location.pathname;
+  const url = `${origin}?invite=${encodeURIComponent(token)}`;
+  return { token, url };
+}
+
+function downloadDataUrl(dataUrl, filename){
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ a.remove(); }, 100);
+}
+
+async function qrDataUrl(text){
+  try{
+    return await QRCode.toDataURL(text, { width: 480, margin: 2, color:{ dark:"#042022", light:"#ffffff" } });
+  }catch(e){
+    console.error("QR generation failed", e);
+    return null;
+  }
+}
+
+function openShareModal(f){
+  const { token, url } = familyInvite(f);
+  const wrap = make("div",{style:"min-width:320px;max-width:560px;display:flex;flex-direction:column;gap:12px"});
+  wrap.appendChild(make("h3",{}, `Share "${f.name}"`));
+
+  const qrImg = make("img",{alt:"Family invite QR", style:"width:200px;height:200px;border-radius:10px;background:#fff;border:1px solid rgba(255,255,255,0.06);display:block;margin:0 auto"});
+  qrImg.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  qrDataUrl(url).then(d => { if(d) qrImg.src = d; });
+
+  const linkInput = make("input",{className:"input", value: url, readOnly:true, style:"font-family:monospace;font-size:12px"});
+  const tokenInput = make("input",{className:"input", value: token, readOnly:true, style:"font-family:monospace;font-size:12px"});
+
+  const copyLink = make("button",{className:"btn small secondary"}, "Copy Link");
+  copyLink.onclick = async () => {
+    try{ await navigator.clipboard.writeText(url); copyLink.textContent = "Copied!"; setTimeout(()=>copyLink.textContent="Copy Link",1500); }
+    catch(e){ notice(url); }
+  };
+  const copyToken = make("button",{className:"btn small secondary"}, "Copy Token");
+  copyToken.onclick = async () => {
+    try{ await navigator.clipboard.writeText(token); copyToken.textContent = "Copied!"; setTimeout(()=>copyToken.textContent="Copy Token",1500); }
+    catch(e){ notice(token); }
+  };
+
+  const dlQr = make("button",{className:"btn small"}, "⬇ Download QR");
+  dlQr.onclick = async () => {
+    const d = await qrDataUrl(url);
+    if(d) downloadDataUrl(d, `family-${f.name.replace(/\W+/g,"-")}-invite.png`);
+    else notice("Could not generate QR.");
+  };
+  const dlLink = make("button",{className:"btn small secondary"}, "⬇ Download Link (.txt)");
+  dlLink.onclick = () => {
+    const blob = new Blob([`Join ${f.name} on GPS-FAMILIA:\n${url}`], {type:"text/plain"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `family-${f.name.replace(/\W+/g,"-")}-invite.txt`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  };
+
+  const text = `Join my family "${f.name}" on GPS-FAMILIA`;
+  const shareTargets = [
+    { key:"whatsapp", label:"WhatsApp", url:`https://wa.me/?text=${encodeURIComponent(text+" "+url)}` },
+    { key:"telegram", label:"Telegram", url:`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}` },
+    { key:"facebook", label:"Facebook", url:`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` },
+    { key:"x", label:"X", url:`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}` },
+    { key:"instagram", label:"Instagram", url:`https://www.instagram.com/` },
+    { key:"snapchat", label:"Snapchat", url:`https://www.snapchat.com/` },
+    { key:"email", label:"Email", url:`mailto:?subject=${encodeURIComponent(text)}&body=${encodeURIComponent(text+" "+url)}` },
+    { key:"sms", label:"SMS", url:`sms:?&body=${encodeURIComponent(text+" "+url)}` }
+  ];
+
+  const shareGrid = make("div",{className:"share-grid"});
+  shareTargets.forEach(t=> shareGrid.appendChild(socialBtn(make, t)));
+
+  const nativeShare = make("button",{className:"btn small secondary"}, "📤 Share…");
+  nativeShare.onclick = async () => {
+    if(navigator.share){
+      try{
+        const d = await qrDataUrl(url);
+        const files = d ? [new File([await (await fetch(d)).blob()], "invite.png", {type:"image/png"})] : [];
+        await navigator.share({ title: text, text: text+" "+url, url, files });
+      }catch(e){ if(e.name !== "AbortError") notice("Share failed: " + e.message); }
+    } else {
+      notice("Sharing not supported on this device. Use the buttons below.");
+    }
+  };
+
+  wrap.appendChild(qrImg);
+  wrap.appendChild(make("div",{className:"row", style:"gap:8px"}, copyLink, dlQr, nativeShare));
+  wrap.appendChild(make("label",{}, "Invite link"));
+  wrap.appendChild(make("div",{className:"row", style:"gap:8px"}, linkInput, dlLink));
+  wrap.appendChild(make("label",{}, "Invite token"));
+  wrap.appendChild(make("div",{className:"row", style:"gap:8px"}, tokenInput, copyToken));
+  wrap.appendChild(make("div",{className:"small-muted", style:"text-align:center"}, "Share via:"));
+  wrap.appendChild(shareGrid);
+
+  return showModal(wrap);
+}
+
+function openDrawer(){
+  closeAccountDrawer();
+  const drawer = qs("#drawer"), scrim = qs("#drawer-scrim");
+  if(drawer){ drawer.classList.add("open"); drawer.setAttribute("aria-hidden","false"); }
+  if(scrim) scrim.classList.add("open");
+  document.body.classList.add("fam-open");
+  updateFamilyMarkers();
+}
+function closeDrawer(){
+  const drawer = qs("#drawer"), scrim = qs("#drawer-scrim");
+  if(drawer){ drawer.classList.remove("open"); drawer.setAttribute("aria-hidden","true"); }
+  if(scrim) scrim.classList.remove("open");
+  document.body.classList.remove("fam-open");
+}
+function closeAccountDrawer(){
+  const d = qs("#account-drawer"), s = qs("#account-scrim");
+  if(d){ d.classList.remove("open"); d.setAttribute("aria-hidden","true"); }
+  if(s) s.classList.remove("open");
+  document.body.classList.remove("acct-open");
+}
+function openAccountDrawer(){
+  closeDrawer();
+  paintAccountDrawer();
+  const d = qs("#account-drawer"), s = qs("#account-scrim");
+  if(d){ d.classList.add("open"); d.setAttribute("aria-hidden","false"); }
+  if(s) s.classList.add("open");
+  document.body.classList.add("acct-open");
+}
+function acctItem(ico, label, fn, cls){
+  const b = make("button",{className:"acct-item" + (cls ? " " + cls : ""), type:"button"});
+  b.appendChild(make("span",{className:"ico"}, ico));
+  b.appendChild(make("span",{}, label));
+  b.onclick = fn;
+  return b;
+}
+function paintAccountDrawer(){
+  const s = currentSession();
+  const u = s ? getUserById(s.userId) : null;
+  const nameEl = qs("#acct-name");
+  const emailEl = qs("#acct-email");
+  const phoneEl = qs("#acct-phone");
+  const av = qs("#acct-avatar");
+  if(nameEl) nameEl.textContent = u ? (u.name || "Member") : "Not signed in";
+  if(emailEl) emailEl.textContent = u ? (u.email || "") : "Sign in to manage your account";
+  if(phoneEl) phoneEl.textContent = u && u.phone ? u.phone : "";
+  if(av){
+    if(u){
+      const dataUrl = getProfileImageForUser(u.id);
+      if(dataUrl) av.src = dataUrl;
+      else {
+        const initials = (u.name || "U").split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();
+        const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='88' height='88'><rect width='100%' height='100%' fill='#233b3a'/><text x='50%' y='54%' font-size='32' fill='#fff' text-anchor='middle' font-family='Arial'>${initials}</text></svg>`;
+        av.src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+      }
+    } else av.src = "";
+  }
+  const nav = qs("#acct-nav");
+  if(!nav) return;
+  nav.innerHTML = "";
+  const go = (fn) => () => { closeAccountDrawer(); fn(); };
+  nav.appendChild(make("div",{className:"acct-sec"}, "Navigate"));
+  nav.appendChild(acctItem("◎", "Center map on me", go(() => centerOnMe())));
+  if(s) nav.appendChild(acctItem("🕘", "Location history & trail", go(() => renderHistoryForUser(s.userId))));
+  nav.appendChild(acctItem("👥", "Family members", () => { closeAccountDrawer(); openDrawer(); }));
+  nav.appendChild(acctItem("＋", "Create / Join family", go(() => renderCreateJoin())));
+  nav.appendChild(acctItem("🔍", "Find people", go(() => renderFamilyList())));
+  nav.appendChild(acctItem("✉️", "Inbox", go(() => renderInbox())));
+  nav.appendChild(acctItem("◈", "Community", go(() => renderCommunityFeed(uiBag()))));
+  nav.appendChild(acctItem("📌", "Save a place", go(() => openAddPlace())));
+  nav.appendChild(acctItem("?", "Help", go(() => renderHelp("welcome"))));
+  nav.appendChild(make("div",{className:"acct-sec"}, "Account"));
+  if(!s){
+    nav.appendChild(acctItem("→", "Sign in / Register", go(() => renderAuth()), "primary"));
+  } else {
+    nav.appendChild(acctItem("✎", "Display name & contact", go(() => renderAccountEdit())));
+    nav.appendChild(acctItem("🔒", "Change password", go(() => renderPasswordChange())));
+    nav.appendChild(acctItem("🛡", "Privacy & security", go(() => renderPrivacySettings())));
+    nav.appendChild(acctItem("🎨", "Theme & appearance", go(() => renderThemePicker())));
+    nav.appendChild(acctItem("⎋", "Sign out", async () => {
+      closeAccountDrawer();
+      if(!await ask("Sign out?")) return;
+      apiTry("/api/logout", { method:"POST", body: {} });
+      try{ if(socket) socket.close(); }catch(e){}
+      stopTracking();
+      clearTrail();
+      setSession(null);
+      closeModal();
+      hidePinSheet();
+      renderAuth();
+    }));
+    nav.appendChild(acctItem("🗑", "Delete account", go(() => renderDeleteAccount()), "danger"));
+  }
+  nav.appendChild(make("div",{className:"acct-sec"}, "About"));
+  nav.appendChild(acctItem("ⓘ", "About the developer", go(() => renderAboutDeveloper())));
+}
+function bindDrawer(){
+  const famBtn = qs("#btn-family"), closeBtn = qs("#drawer-close"), scrim = qs("#drawer-scrim");
+  if(famBtn) famBtn.onclick = () => {
+    const d = qs("#drawer");
+    if(d && d.classList.contains("open")) closeDrawer(); else openDrawer();
+  };
+  if(closeBtn) closeBtn.onclick = closeDrawer;
+  if(scrim) scrim.onclick = closeDrawer;
+  const createDrawer = qs("#btn-create-family-drawer");
+  if(createDrawer) createDrawer.onclick = () => { closeDrawer(); renderCreateJoin(); };
+  const find = qs("#drawer-find");
+  if(find){
+    find.addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){
+        e.preventDefault();
+        const q = find.value.trim();
+        closeDrawer();
+        renderFamilyList(q);
+      }
+    });
+  }
+  const acctBtn = qs("#btn-account");
+  const acctClose = qs("#account-close");
+  const acctScrim = qs("#account-scrim");
+  if(acctBtn) acctBtn.onclick = () => {
+    const d = qs("#account-drawer");
+    if(d && d.classList.contains("open")) closeAccountDrawer(); else openAccountDrawer();
+  };
+  if(acctClose) acctClose.onclick = closeAccountDrawer;
+  if(acctScrim) acctScrim.onclick = closeAccountDrawer;
+  const avBtn = qs("#acct-avatar-btn");
+  if(avBtn) avBtn.onclick = () => {
+    const sess = currentSession();
+    if(!sess) { closeAccountDrawer(); renderAuth(); return; }
+    const input = qs("#profile-input");
+    if(input) input.click();
+  };
+}
+
+function openAddPlace(){
+  if(!map) return notice("Map is still loading.");
+  const center = map.getCenter();
+  const wrap = make("div",{style:"display:flex;flex-direction:column;gap:8px;min-width:280px"});
+  wrap.appendChild(make("h3",{}, "Add Named Place"));
+  const name = make("input",{className:"input", placeholder:"Name (e.g. Home)"});
+  const desc = make("input",{className:"input", placeholder:"Optional description"});
+  const save = make("button",{className:"btn", type:"button"}, "Save Place at map center");
+  save.onclick = () => {
+    const p = { id: uid("p"), name: name.value || "Place", desc: desc.value || "", lat: center.lat, lng: center.lng, createdAt: now() };
+    savePlace(p);
+    notice("Place saved: " + p.name);
+    closeModal();
+  };
+  wrap.append(name, desc, make("div",{className:"row", style:"justify-content:flex-end"}, save));
+  showModal(wrap);
+}
+
+function renderAccountEdit(){
+  const s = currentSession(); if(!s) return renderAuth();
+  const u = getUserById(s.userId) || {};
+  const wrap = make("div");
+  wrap.appendChild(make("h3",{}, "Display name & contact"));
+  const name = make("input",{className:"input", value: u.name || ""});
+  const email = make("input",{className:"input", value: u.email || ""});
+  const phone = make("input",{className:"input", value: u.phone || ""});
+  const save = make("button",{className:"btn", type:"button"}, "Save");
+  save.onclick = async () => {
+    try{
+      const j = await api("/api/me", { method:"PUT", body: { name: name.value.trim(), email: email.value.trim(), phone: phone.value.trim() } });
+      if(j && j.user) cacheUserFromServer(j.user);
+      paintAccountDrawer();
+      updateUIForSession();
+      notice("Profile updated.");
+      closeModal();
+    }catch(e){ notice(e.message || "Could not save"); }
+  };
+  wrap.append(
+    make("label",{}, "Display name"), name,
+    make("label",{}, "Email"), email,
+    make("label",{}, "Phone"), phone,
+    make("div",{className:"row", style:"margin-top:12px;justify-content:flex-end"}, save)
+  );
+  showModal(wrap);
+}
+
+function renderPasswordChange(){
+  const s = currentSession(); if(!s) return renderAuth();
+  const wrap = make("div");
+  wrap.appendChild(make("h3",{}, "Change password"));
+  wrap.appendChild(make("p",{className:"small-muted"}, "If you signed in with Google or a demo account and never set a password, leave Current blank."));
+  const cur = make("input",{className:"input", type:"password", placeholder:"Current password"});
+  const n1 = make("input",{className:"input", type:"password", placeholder:"New password (min 6)"});
+  const n2 = make("input",{className:"input", type:"password", placeholder:"Verify new password"});
+  const save = make("button",{className:"btn", type:"button"}, "Update password");
+  save.onclick = async () => {
+    if((n1.value || "").length < 6) return notice("New password must be at least 6 characters.");
+    if(n1.value !== n2.value) return notice("New passwords do not match.");
+    try{
+      await api("/api/me/password", { method:"POST", body: { current: cur.value, next: n1.value } });
+      notice("Password updated.");
+      closeModal();
+    }catch(e){ notice(e.message || "Could not change password"); }
+  };
+  wrap.append(make("label",{}, "Current"), cur, make("label",{}, "New"), n1, n2, make("div",{className:"row", style:"margin-top:12px;justify-content:flex-end"}, save));
+  showModal(wrap);
+}
+
+function renderPrivacySettings(){
+  const s = currentSession(); if(!s) return renderAuth();
+  const u = getUserById(s.userId) || {};
+  const prefs = memberPrefs(u);
+  const wrap = make("div");
+  wrap.appendChild(make("h3",{}, "Privacy & security"));
+  wrap.appendChild(make("p",{className:"small-muted"}, "These controls decide what family members see when they tap your pin or name. Search never shows your coordinates."));
+  const rows = [
+    ["appearOnMap", "Show my pin on the family map"],
+    ["preciseLocation", "Share precise GPS (off = city-block approximate)"],
+    ["showLastSeen", "Show last-seen time on my pin"],
+    ["shareEmailWithFamily", "Share email with family"],
+    ["sharePhoneWithFamily", "Share phone with family"],
+    ["allowHistory", "Allow family to view my location history"],
+    ["recordHistory", "Record my trail every minute while Track is On"]
+  ];
+  const state = Object.assign({}, prefs);
+  rows.forEach(([key, label]) => {
+    const row = make("div",{className:"pref-row"});
+    row.appendChild(make("label",{}, label));
+    const sw = make("input",{className:"switch", type:"checkbox"});
+    sw.checked = state[key] !== false;
+    sw.onchange = () => { state[key] = sw.checked; };
+    row.appendChild(sw);
+    wrap.appendChild(row);
+  });
+  const save = make("button",{className:"btn", type:"button"}, "Save privacy");
+  save.onclick = async () => {
+    try{
+      const j = await api("/api/me", { method:"PUT", body: { prefs: state } });
+      if(j && j.user) cacheUserFromServer(j.user);
+      notice("Privacy settings saved. Family pins will refresh.");
+      closeModal();
+      refreshMapPins();
+    }catch(e){ notice(e.message || "Could not save"); }
+  };
+  wrap.appendChild(make("div",{className:"row", style:"margin-top:14px;justify-content:flex-end"}, save));
+  showModal(wrap);
+}
+
+function renderThemePicker(){
+  const wrap = make("div");
+  wrap.appendChild(make("h3",{}, "Theme & appearance"));
+  wrap.appendChild(make("p",{className:"small-muted"}, "Personalize GPS FAMILIA. Your choice stays on this device."));
+  const grid = make("div",{className:"theme-grid"});
+  const cur = localStorage.getItem(THEME_KEY) || "dark";
+  const themes = [
+    ["dark", "Midnight"],
+    ["gold", "Godfather gold"],
+    ["noir", "Noir"],
+    ["light", "Daylight"]
+  ];
+  themes.forEach(([id, label]) => {
+    const b = make("button",{className:"theme-swatch" + (cur===id ? " on" : ""), type:"button"}, label);
+    b.onclick = () => {
+      applyTheme(id);
+      grid.querySelectorAll(".theme-swatch").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+    };
+    grid.appendChild(b);
+  });
+  wrap.appendChild(grid);
+  showModal(wrap);
+}
+
+function renderDeleteAccount(){
+  const s = currentSession(); if(!s) return renderAuth();
+  const wrap = make("div");
+  wrap.appendChild(make("h3",{}, "Delete account"));
+  wrap.appendChild(make("p",{className:"privacy-note"}, "This permanently removes your login, pins, and messages you sent. Demo sample members cannot be deleted."));
+  const pw = make("input",{className:"input", type:"password", placeholder:"Password to confirm"});
+  const go = make("button",{className:"btn", type:"button", style:"background:var(--danger);color:#fff"}, "Delete my account");
+  go.onclick = async () => {
+    if(!await ask("Delete your GPS FAMILIA account? This cannot be undone.")) return;
+    try{
+      await api("/api/me", { method:"DELETE", body: { password: pw.value } });
+      try{ if(socket) socket.close(); }catch(e){}
+      setSession(null);
+      closeModal();
+      notice("Account deleted.");
+      renderAuth();
+    }catch(e){ notice(e.message || "Could not delete account"); }
+  };
+  wrap.append(pw, make("div",{className:"row", style:"margin-top:12px;justify-content:flex-end"}, go));
+  showModal(wrap);
+}
+
+function renderAboutDeveloper(){
+  const wrap = make("div");
+  wrap.appendChild(make("div",{className:"help-kicker"}, "Hustler Anomalies Enterprises"));
+  wrap.appendChild(make("h3",{}, "About GPS FAMILIA"));
+  wrap.appendChild(make("p",{}, "GPS FAMILIA is a private family locator and encrypted messenger. It is a consumer convenience tool — not 911, not a surveillance product."));
+  wrap.appendChild(make("p",{className:"small-muted"}, "Operator: Hustler Anomalies Enterprises, together with the developer(s) and associated parties. The Service is provided as-is. Full legal terms live in Help → Terms."));
+  wrap.appendChild(make("p",{}, "Family. Loyalty. Location."));
+  const terms = make("button",{className:"btn small", type:"button"}, "Open Terms");
+  terms.onclick = () => { closeModal(); renderHelp("terms"); };
+  wrap.appendChild(make("div",{className:"row", style:"margin-top:12px"}, terms));
+  showModal(wrap);
+}
+
+function userCard(u, opts={}){
+  const inFam = u.inFamily || isFamilyWith(u.id);
+  const row = make("div",{className:"user-hit"});
+  const av = make("div",{className:"chat-avatar", style:"width:36px;height:36px;flex:0 0 36px;font-size:12px"});
+  av.innerHTML = getAvatarFor(u);
+  const info = make("div",{style:"flex:1;min-width:0"});
+  const title = make("div",{style:"font-weight:700;display:flex;align-items:center;gap:6px"}, u.name || u.email || ("User "+String(u.id).slice(-4)));
+  if(inFam) title.appendChild(make("span",{className:"fam-pill"}, "Family"));
+  info.appendChild(title);
+  const metaBits = [];
+  if(u.phone) metaBits.push(u.phone);
+  if(u.email) metaBits.push(u.email);
+  info.appendChild(make("div",{className:"small-muted"}, metaBits.join(" • ") || "No contact on file"));
+  if(!inFam){
+    info.appendChild(make("div",{className:"small-muted"}, "Location hidden — not in your family"));
+  }
+  const actions = make("div",{className:"row", style:"flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end"});
+  const msgBtn = make("button",{className:"btn small", type:"button"}, "Message");
+  msgBtn.onclick = () => { closeModal(); renderMessagesForUser(u.id); };
+  actions.appendChild(msgBtn);
+  if(inFam && u.lastLocation && map){
+    const mapBtn = make("button",{className:"btn small secondary", type:"button"}, "On map");
+    mapBtn.onclick = () => { map.flyTo([u.lastLocation.lat, u.lastLocation.lng], 14); closeModal(); };
+    actions.appendChild(mapBtn);
+  }
+  const fams = myFamilies();
+  if(fams.length > 1){
+    const sel = make("select",{className:"input", style:"width:auto;min-width:110px;padding:8px"});
+    fams.forEach(f => sel.appendChild(make("option",{value:f.id}, f.name)));
+    actions.appendChild(sel);
+    const inviteBtn = make("button",{className:"btn small secondary", type:"button"}, "Invite");
+    inviteBtn.onclick = async () => {
+      const pick = fams.find(f => f.id === sel.value) || fams[0];
+      const { url } = familyInvite(pick);
+      await sendEncryptedMessage(currentSession().userId, u.id, { text: `Join my family "${pick.name}" on GPS-FAMILIA: ${url}` });
+      notice("Invite sent as a message.");
+    };
+    actions.appendChild(inviteBtn);
+  } else {
+    const inviteBtn = make("button",{className:"btn small secondary", type:"button"}, "Invite");
+    inviteBtn.onclick = async () => {
+      if(!fams.length){ notice("Create a family first, then invite them."); closeModal(); renderCreateJoin(); return; }
+      const pick = fams[0];
+      const { url } = familyInvite(pick);
+      await sendEncryptedMessage(currentSession().userId, u.id, { text: `Join my family "${pick.name}" on GPS-FAMILIA: ${url}` });
+      notice("Invite sent as a message.");
+    };
+    actions.appendChild(inviteBtn);
+  }
+  row.append(av, info, actions);
+  return row;
+}
+
+function renderFamilyList(prefillQ){
+  const wrap = make("div");
+  wrap.appendChild(make("h3",{}, "Find people & families"));
+
+  const hero = make("div",{className:"search-hero"});
+  const searchInput = make("input",{className:"input", type:"search", placeholder:"Search by name or phone number…", autocomplete:"off"});
+  if(prefillQ) searchInput.value = prefillQ;
+  hero.appendChild(make("label",{}, "Directory search"));
+  hero.appendChild(searchInput);
+  hero.appendChild(make("div",{className:"privacy-note"}, "Search the live database by name or phone. Other users’ locations are never shown unless they belong to one of your families."));
+  wrap.appendChild(hero);
+
+  const resultsWrap = make("div",{style:"max-height:360px;overflow:auto;display:flex;flex-direction:column;gap:8px"});
+  wrap.appendChild(resultsWrap);
+
+  async function renderResults(q){
+    resultsWrap.innerHTML = "";
+    const query = (q || "").trim();
+    const families = storage.get(DB.familiesKey) || [];
+    const users = storage.get(DB.usersKey) || [];
+    const qLower = query.toLowerCase();
+    const qDigits = digits(query);
+
+    let remote = null;
+    if(query.length >= 1){
+      remote = await apiTry("/api/search?q=" + encodeURIComponent(query));
+    }
+
+    const famMatches = remote && remote.families
+      ? remote.families.filter(f => !f.isMember)
+      : families.filter(f => (f.privacy === "public") && (!qLower || (f.name||"").toLowerCase().includes(qLower) || (f.id && f.id.includes(qLower))));
+
+    const qUsers = remote && remote.users
+      ? remote.users
+      : users.filter(u => {
+          const s = currentSession();
+          if(s && u.id === s.userId) return false;
+          if(!qLower) return false;
+          const name = (u.name || "").toLowerCase();
+          const email = (u.email || "").toLowerCase();
+          const phone = (u.phone || "").toLowerCase();
+          const phD = digits(u.phone);
+          return name.includes(qLower) || email.includes(qLower) || phone.includes(qLower) || (qDigits.length >= 3 && phD.includes(qDigits));
+        }).map(u => Object.assign({}, u, { inFamily: isFamilyWith(u.id), lastLocation: isFamilyWith(u.id) ? u.lastLocation : undefined }));
+
+    if(!query){
+      resultsWrap.appendChild(make("div",{className:"small-muted"}, "Type a name or phone number to search the directory."));
+    }
+
+    if(qUsers.length){
+      resultsWrap.appendChild(make("div",{className:"small-muted", style:"margin:4px 0"}, "People"));
+      qUsers.forEach(u => resultsWrap.appendChild(userCard(u)));
+    }
+
+    if(famMatches.length){
+      resultsWrap.appendChild(make("div",{className:"small-muted", style:"margin:8px 0 4px"}, "Public families you can join"));
+      famMatches.forEach(f=>{
+        const card = make("div",{className:"family-card"});
+        const count = f.memberCount != null ? f.memberCount : (f.members||[]).length;
+        const info = make("div",{}, make("div",{}, f.name), make("div",{className:"small-muted"}, `${count} members • you can join in addition to families you already have`));
+        const actions = make("div",{className:"row"});
+        const joinBtn = make("button",{className:"btn small"}, "Join");
+        joinBtn.onclick = async () => {
+          if(!currentSession()){ notice("Sign in first"); return; }
+          const j = await apiTry(`/api/families/${f.id}/join`, { method:"POST", body: {} });
+          if(j && j.family){
+            cacheFamily(j.family);
+            notice("Joined " + f.name + ". Location will be shared with that family only.");
+            closeModal();
+            updateFamilyMarkers();
+            return;
+          }
+          if(j && j.requested){
+            notice("Request sent to the family owner. They must accept you before location is shared.");
+            return;
+          }
+          notice("Request sent to family admins. They must accept you before location is shared.");
+        };
+        actions.append(joinBtn);
+        card.append(info, actions);
+        resultsWrap.appendChild(card);
+      });
+    }
+
+    const postHits = (remote && remote.posts) || [];
+    if(postHits.length){
+      resultsWrap.appendChild(make("div",{className:"small-muted", style:"margin:8px 0 4px"}, "Community posts"));
+      postHits.forEach(p => {
+        const card = make("div",{className:"family-card"});
+        const info = make("div",{}, make("div",{}, (p.authorName || "User") + " · " + (p.audience === "public" ? "Everyone" : "Family")), make("div",{className:"small-muted"}, p.text || ""));
+        const open = make("button",{className:"btn small"}, "Open feed");
+        open.onclick = () => { closeModal(); openFeedPanel({ postId: p.id }); };
+        card.append(info, open);
+        resultsWrap.appendChild(card);
+      });
+    }
+
+    if(query && famMatches.length===0 && qUsers.length===0 && postHits.length===0){
+      resultsWrap.appendChild(make("div",{className:"small-muted"}, "No people, posts, or public families matched that name or number."));
+    }
+  }
+
+  searchInput.addEventListener("input", debounce(() => renderResults(searchInput.value), 220));
+  searchInput.addEventListener("keydown", (e) => { if(e.key === "Enter"){ e.preventDefault(); renderResults(searchInput.value); } });
+
+  const myWrap = make("div",{style:"margin-top:12px"});
+  myWrap.appendChild(make("h3",{}, "Your Families"));
+  const list = make("div",{className:"family-list"});
+  const s = currentSession();
+  if(!s) { list.appendChild(make("div",{}, "Sign in to see families.")); }
+  else {
+    const mine = myFamilies();
+    if(mine.length===0) list.appendChild(make("div",{}, "No families yet — you can join several once you create or accept invites."));
+    mine.forEach(f=>{
+      const card = make("div",{className:"family-card"});
+      const info = make("div",{}, make("div",{}, f.name), make("div",{className:"small-muted"}, (f.privacy || "private") + " • " + (f.members||[]).length + " members"));
+      const actions = make("div",{className:"row"});
+      const centerBtn = make("button",{className:"btn small secondary"}, "Center Map");
+      centerBtn.onclick = () => { centerOnFamily(f.id); closeModal(); };
+      const chatBtn = make("button",{className:"btn small"}, "Family chat");
+      chatBtn.onclick = () => { closeModal(); renderFamilyChat(f.id); };
+      const inviteBtn = make("button",{className:"btn small secondary"}, "Invite / QR");
+      inviteBtn.onclick = () => { openShareModal(f); };
+      const setBtn = make("button",{className:"btn small secondary"}, "Settings");
+      setBtn.onclick = () => { closeModal(); renderFamilyAdmin(uiBag(), f.id); };
+      actions.append(centerBtn, chatBtn, inviteBtn, setBtn);
+      card.append(info, actions);
+      list.appendChild(card);
+    });
+  }
+  myWrap.appendChild(list);
+
+  wrap.appendChild(myWrap);
+  wrap.appendChild(make("div",{className:"row", style:"justify-content:flex-end;margin-top:10px"}, make("button",{className:"btn small secondary", onclick:()=>{ closeModal(); renderCreateJoin(); }}, "Create/Join")));
+  showModal(wrap);
+
+  renderResults(searchInput.value || "");
+  setTimeout(()=> searchInput.focus(), 50);
+}
+
+let markers = {}, userMarker = null, watchId = null, trackingEnabled = false;
+let historyTimer = null, lastFix = null, trailGroup = null;
+let map = null;
+let baseLayers = { street: null, satellite: null, terrain: null };
+let currentBase = "street";
+let placeMarkers = {};
+
+function initMap(){
+  try{ if(map && map.remove) map.remove(); }catch(e){ console.warn("Previous map remove failed", e); }
+  map = null;
+
+  if(typeof window.L === "undefined"){
+    setTimeout(initMap, 100);
+    return;
+  }
+
+  map = L.map("map", {
+    center: [39.7392, -104.9903],
+    zoom: 12.5,
+    zoomControl: false,
+    attributionControl: true,
+    preferCanvas: true,
+    trackResize: true
+  });
+
+  baseLayers.street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: '© OpenStreetMap contributors', crossOrigin:true, reuseTiles:true, detectRetina:true
+  });
+  baseLayers.satellite = L.tileLayer("https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19, attribution: 'Esri', crossOrigin:true, reuseTiles:true, detectRetina:true
+  });
+  baseLayers.terrain = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+    maxZoom: 17, attribution: '© OpenTopoMap (CC-BY-SA)', crossOrigin:true, reuseTiles:true, detectRetina:true
+  });
+
+  baseLayers.street.addTo(map);
+
+  const layerCtl = qs("#layer-control");
+  if(layerCtl){
+    layerCtl.querySelectorAll(".layer-btn").forEach(btn=>{
+      btn.onclick = () => switchBase(btn.dataset.layer);
+    });
+  }
+
+  function switchBase(kind){
+    if(kind === currentBase) return;
+    if(currentBase && baseLayers[currentBase]) map.removeLayer(baseLayers[currentBase]);
+    if(baseLayers[kind]) baseLayers[kind].addTo(map);
+    currentBase = kind;
+    const parent = qs("#layer-control");
+    if(parent){
+      parent.querySelectorAll(".layer-btn").forEach(b=> b.classList.toggle("active", b.dataset.layer === kind));
+    }
+  }
+
+  bindMapTools();
+
+  if(!qs(".map-legend")){
+    const legend = make("div",{className:"map-legend"}, "Markers show family members who have shared location. People outside your families never appear on the map.");
+    document.body.appendChild(legend);
+  }
+
+  map.on("moveend", ()=>{
+    const c = map.getCenter();
+    localStorage.setItem("f360_view", JSON.stringify({center:[c.lat,c.lng], zoom: map.getZoom(), base: currentBase}));
+  });
+
+  const last = JSON.parse(localStorage.getItem("f360_view") || "null");
+  if(last && last.center && last.center.length === 2){
+    map.setView([ last.center[0], last.center[1] ], last.zoom || 12);
+    if(last.base && baseLayers[last.base]){ baseLayers[last.base].addTo(map); currentBase = last.base; }
+  } else {
+    map.setView([39.7392, -104.9903], 12.5);
+  }
+
+  const layerCtl2 = qs("#layer-control");
+  if(layerCtl2){
+    layerCtl2.querySelectorAll(".layer-btn").forEach(b=> b.classList.toggle("active", b.dataset.layer === currentBase));
+  }
+
+  window.reflowMap = () => { try{ map.invalidateSize(true); }catch(e){} };
+  window.addEventListener("resize", ()=>{ try{ map.invalidateSize(true); }catch(e){} });
+
+  setTimeout(()=>{ try{ map.invalidateSize(true); }catch(e){} }, 150);
+
+  renderSavedPlacesToMap();
+  setInterval(updateFamilyMarkers, 3000);
+}
+
+function getSavedPlaces(){ return storage.get(DB.placesKey) || []; }
+function savePlace(place){
+  const places = getSavedPlaces();
+  places.push(place);
+  storage.set(DB.placesKey, places);
+  renderSavedPlacesToMap();
+  apiTry("/api/places", { method:"POST", body: place });
+}
+function renderSavedPlacesToMap(){
+  if(!map) return;
+  Object.values(placeMarkers).forEach(pm=>{ try{ map.removeLayer(pm); }catch(e){} });
+  placeMarkers = {};
+  const places = getSavedPlaces();
+  places.forEach(p=>{
+    const icon = L.divIcon({
+      html: `<div style="display:flex;align-items:center;gap:8px;"><div style="width:36px;height:36px;border-radius:8px;background:rgba(45,212,191,0.15);display:flex;align-items:center;justify-content:center;border:2px solid rgba(45,212,191,0.25)">${(p.name||"P")[0] || "P"}</div><div style="background:rgba(2,6,23,0.85);color:#e6eef0;padding:6px 8px;border-radius:8px;font-weight:700;font-size:13px">${p.name}</div></div>`,
+      className:"",
+      iconSize: [160,48],
+      iconAnchor: [18,18]
+    });
+    const m = L.marker([p.lat,p.lng],{icon}).addTo(map);
+    m.on('click',()=>{ L.popup({offset:[0,-8]}).setContent(`<div style="padding:8px"><strong>${p.name}</strong><div class="small-muted" style="margin-top:6px">${p.desc||''}</div></div>`).setLatLng([p.lat,p.lng]).openOn(map); });
+    placeMarkers[p.id] = m;
+  });
+}
+
+function centerOnFamily(fid){
+  const families = storage.get(DB.familiesKey) || [];
+  const f = families.find(x=>x.id===fid); if(!f) return;
+  const points = (f.members || []).map(mId => {
+    const u = getUserById(mId);
+    return u && u.lastLocation ? [u.lastLocation.lat, u.lastLocation.lng] : null;
+  }).filter(Boolean);
+  if(points.length===0) { notice("No shared locations available."); return; }
+  if(points.length === 1){ map.flyTo(points[0], 14); return; }
+  try{
+    map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 15 });
+  }catch(e){
+    map.flyTo(points[0], 13);
+  }
+}
+
+function memberPrefs(u){
+  return Object.assign({
+    appearOnMap: true, preciseLocation: true, showLastSeen: true,
+    shareEmailWithFamily: true, sharePhoneWithFamily: true, allowHistory: true, recordHistory: true
+  }, (u && u.prefs) || {});
+}
+
+function bindMapTools(){
+  const zi = qs("#btn-zoom-in");
+  const zo = qs("#btn-zoom-out");
+  const rf = qs("#btn-map-refresh");
+  const me = qs("#btn-map-me");
+  if(zi) zi.onclick = () => { if(map) map.setZoom(Math.min((map.getZoom() || 12) + 1, 19)); };
+  if(zo) zo.onclick = () => { if(map) map.setZoom(Math.max((map.getZoom() || 12) - 1, 2)); };
+  if(rf) rf.onclick = () => refreshMapPins();
+  if(me) me.onclick = () => centerOnMe();
+  const ht = qs("#btn-map-trail");
+  if(ht) ht.onclick = () => {
+    if(trailGroup){ clearTrail(); return; }
+    const s = currentSession();
+    if(!s) return notice("Sign in to map your trail.");
+    drawUserTrail(s.userId);
+  };
+}
+
+async function refreshMapPins(){
+  const btn = qs("#btn-map-refresh");
+  if(btn){ btn.classList.remove("spin"); void btn.offsetWidth; btn.classList.add("spin"); }
+  const s = currentSession();
+  if(!s){ notice("Sign in to refresh family pins."); return; }
+  await syncFromServer();
+  const locs = await apiTry("/api/locations");
+  if(locs && Array.isArray(locs.locations)){
+    locs.locations.forEach(l => {
+      if(!l || !l.userId) return;
+      applyRemoteLocation(l.userId, l.lat, l.lng, l.ts || now());
+    });
+  }
+  updateFamilyMarkers();
+  if(map) try{ map.invalidateSize(true); }catch(e){}
+}
+
+function hidePinSheet(){
+  const el = qs("#pin-sheet");
+  if(el){ el.hidden = true; el.innerHTML = ""; }
+}
+
+function showPinSheet(u, opts={}){
+  const el = qs("#pin-sheet");
+  if(!el || !u) return;
+  const s = currentSession();
+  const self = !!(s && s.userId === u.id);
+  const inFam = self || isFamilyWith(u.id);
+  const prefs = memberPrefs(u);
+  const loc = opts.loc || (inFam && prefs.appearOnMap !== false ? u.lastLocation : null);
+  el.hidden = false;
+  el.innerHTML = "";
+  const close = make("button",{className:"pin-close", type:"button", title:"Close"}, "✕");
+  close.onclick = hidePinSheet;
+  const head = make("div",{className:"pin-sheet-head"});
+  const av = make("div",{className:"pin-sheet-av"});
+  av.innerHTML = getAvatarFor(u);
+  const info = make("div",{style:"min-width:0;flex:1"});
+  info.appendChild(make("div",{style:"font-weight:800;font-size:16px"}, u.name || "User"));
+  const bits = [];
+  if(self) bits.push("You");
+  else if(inFam) bits.push("Family");
+  else bits.push("Not in your family");
+  if(u.online) bits.push("Live");
+  info.appendChild(make("div",{className:"small-muted"}, bits.join(" · ")));
+  head.append(av, info);
+  el.append(close, head);
+
+  const body = make("div",{style:"margin-top:10px"});
+  if(!inFam){
+    body.appendChild(make("div",{className:"privacy-note"}, "Location, last seen, and contact details stay hidden until you share a family."));
+  } else {
+    if(loc){
+      const approx = loc.approx ? "Approximate (privacy)" : "Precise";
+      const ts = loc.ts ? new Date(loc.ts).toLocaleString() : (prefs.showLastSeen === false && !self ? "Last seen hidden" : "Time unknown");
+      body.appendChild(make("div",{}, approx + " pin"));
+      body.appendChild(make("div",{className:"small-muted"}, Number(loc.lat).toFixed(loc.approx ? 2 : 5) + ", " + Number(loc.lng).toFixed(loc.approx ? 2 : 5)));
+      body.appendChild(make("div",{className:"small-muted"}, ts));
+    } else {
+      body.appendChild(make("div",{className:"privacy-note"}, self ? "Turn Track On to drop your pin." : "This member is not sharing a map pin (Track Off, Guest role, or their privacy settings)."));
+    }
+    if(inFam && prefs.shareEmailWithFamily !== false && u.email) body.appendChild(make("div",{className:"small-muted", style:"margin-top:6px"}, u.email));
+    if(inFam && prefs.sharePhoneWithFamily !== false && u.phone) body.appendChild(make("div",{className:"small-muted"}, u.phone));
+  }
+  el.appendChild(body);
+
+  const actions = make("div",{className:"pin-sheet-actions"});
+  const msg = make("button",{className:"btn small", type:"button"}, "Message");
+  msg.onclick = () => { hidePinSheet(); renderMessagesForUser(u.id); };
+  actions.appendChild(msg);
+  if(inFam && loc && map){
+    const zoom = make("button",{className:"btn small secondary", type:"button"}, "Zoom in");
+    zoom.onclick = () => { map.flyTo([loc.lat, loc.lng], 17); };
+    actions.appendChild(zoom);
+  }
+  if(inFam && (self || prefs.allowHistory !== false)){
+    const hist = make("button",{className:"btn small secondary", type:"button"}, "History");
+    hist.onclick = () => { hidePinSheet(); renderHistoryForUser(u.id); };
+    actions.appendChild(hist);
+    const trail = make("button",{className:"btn small secondary", type:"button"}, "Map trail");
+    trail.onclick = () => { hidePinSheet(); drawUserTrail(u.id); };
+    actions.appendChild(trail);
+  }
+  el.appendChild(actions);
+}
+
+function focusMember(userId){
+  const u = getUserById(userId);
+  if(!u){ notice("Person not found."); return; }
+  closeDrawer();
+  closeAccountDrawer();
+  const s = currentSession();
+  const self = !!(s && s.userId === u.id);
+  const inFam = self || isFamilyWith(u.id);
+  const prefs = memberPrefs(u);
+  const canSeePin = inFam && prefs.appearOnMap !== false && u.lastLocation;
+  if(canSeePin && map){
+    map.flyTo([u.lastLocation.lat, u.lastLocation.lng], 16, { duration: 0.75 });
+    const rec = markers[u.id];
+    if(rec && rec.marker){
+      try{ rec.marker.setZIndexOffset(800); }catch(e){}
+    }
+  } else if(!inFam){
+    notice("You can message " + (u.name || "them") + ", but their pin stays private until you share a family.");
+  } else if(!u.lastLocation){
+    /* sheet explains */
+  }
+  showPinSheet(u, { loc: canSeePin ? u.lastLocation : null });
+}
+
+function getUserById(id){ const users = storage.get(DB.usersKey)||[]; return users.find(u=>u.id===id); }
+function saveUser(u){ let users = storage.get(DB.usersKey)||[]; const idx = users.findIndex(x=>x.id===u.id); if(idx>=0) users[idx]=u; else users.push(u); storage.set(DB.usersKey, users); }
+
+const MSG_KEY = "f360_messages_v1";
+if(!storage.get(MSG_KEY)) storage.set(MSG_KEY, []);
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+let msgKeyCache = {};
+
+async function deriveConvKey(a,b){
+  const pair = [a,b].sort().join("|");
+  if(msgKeyCache[pair]) return msgKeyCache[pair];
+  const hash = await crypto.subtle.digest("SHA-256", enc.encode("GPS-FAMILIA-E2E::" + pair));
+  const key = await crypto.subtle.importKey("raw", hash, "AES-GCM", false, ["encrypt","decrypt"]);
+  msgKeyCache[pair] = key;
+  return key;
+}
+async function aesEncrypt(key, obj){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, enc.encode(JSON.stringify(obj)));
+  const b64 = b => btoa(String.fromCharCode.apply(null, new Uint8Array(b)));
+  return { iv: b64(iv), ct: b64(ct) };
+}
+async function aesDecrypt(key, box){
+  try{
+    const iv = Uint8Array.from(atob(box.iv), c=>c.charCodeAt(0));
+    const ct = Uint8Array.from(atob(box.ct), c=>c.charCodeAt(0));
+    const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, ct);
+    return JSON.parse(dec.decode(pt));
+  }catch(e){ return null; }
+}
+
+async function sendEncryptedFamilyMessage(familyId, payload){
+  const s = currentSession();
+  if(!s) return;
+  const key = await deriveConvKey("fam", familyId);
+  const box = await aesEncrypt(key, payload);
+  const msgs = storage.get(MSG_KEY) || [];
+  const m = { id: uid("m"), from: s.userId, familyId, enc: box, ts: now() };
+  msgs.push(m);
+  storage.set(MSG_KEY, msgs);
+  const posted = await apiTry("/api/messages", { method:"POST", body: { familyId, enc: box } });
+  if(posted && posted.message) upsertServerMessage(posted.message);
+  updateInboxBadge();
+  return m;
+}
+
+function currentUserId(){ const s = currentSession(); return s && s.userId; }
+function isDeletedForMe(m){
+  const uid = currentUserId();
+  return !!(m && Array.isArray(m.deletedFor) && uid && m.deletedFor.includes(uid));
+}
+
+async function deleteMessageById(id, mine){
+  if(!id) return false;
+  const ok = await ask(mine ? "Delete this message for everyone in the chat?" : "Remove this message from your view?");
+  if(!ok) return false;
+  const j = await apiTry("/api/messages/" + encodeURIComponent(id), { method: "DELETE" });
+  removeLocalMessage(id);
+  if(!j){
+    /* still hide locally */
+  }
+  if(typeof window.__refreshOpenChat === "function") window.__refreshOpenChat();
+  updateInboxBadge();
+  return true;
+}
+
+function hideMsgMenu(){
+  document.querySelectorAll(".msg-menu").forEach(n => n.remove());
+}
+
+function showMsgMenu(ev, m, mine, payload){
+  hideMsgMenu();
+  const menu = make("div",{className:"msg-menu"});
+  const copy = make("button",{type:"button"}, "Copy");
+  copy.onclick = async () => {
+    hideMsgMenu();
+    const t = (payload && payload.text) || "";
+    try{ await navigator.clipboard.writeText(t); }catch(e){ notice(t || "Nothing to copy"); }
+  };
+  const del = make("button",{type:"button", className:"danger"}, mine ? "Delete for everyone" : "Delete for me");
+  del.onclick = () => { hideMsgMenu(); deleteMessageById(m.id, mine); };
+  menu.append(copy, del);
+  document.body.appendChild(menu);
+  const x = Math.min(window.innerWidth - 200, Math.max(8, (ev.clientX || 80)));
+  const y = Math.min(window.innerHeight - 120, Math.max(8, (ev.clientY || 80)));
+  menu.style.left = x + "px";
+  menu.style.top = y + "px";
+  const off = (e) => { if(!menu.contains(e.target)){ hideMsgMenu(); document.removeEventListener("mousedown", off); } };
+  setTimeout(() => document.addEventListener("mousedown", off), 0);
+}
+
+function bindMessageGestures(row, m, mine, payload){
+  row.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    showMsgMenu(e, m, mine, payload);
+  });
+  let t = null;
+  row.addEventListener("touchstart", (e) => {
+    const touch = e.touches && e.touches[0];
+    t = setTimeout(() => {
+      row.classList.add("held");
+      showMsgMenu({ clientX: touch ? touch.clientX : 80, clientY: touch ? touch.clientY : 80 }, m, mine, payload);
+    }, 520);
+  }, { passive: true });
+  const cancel = () => { clearTimeout(t); row.classList.remove("held"); };
+  row.addEventListener("touchend", cancel);
+  row.addEventListener("touchmove", cancel);
+}
+
+async function getDecryptedFamily(familyId){
+  const key = await deriveConvKey("fam", familyId);
+  const local = storage.get(MSG_KEY) || [];
+  const remote = storage.get(DB.serverMsgsKey) || [];
+  const map = new Map();
+  [...remote, ...local].forEach(m => {
+    if(m.familyId === familyId && !isDeletedForMe(m)) map.set(m.id, m);
+  });
+  const raw = Array.from(map.values()).sort((x,y)=>x.ts-y.ts);
+  const out = [];
+  for(const m of raw){
+    if(m.enc){
+      const payload = await aesDecrypt(key, m.enc) || { text: m.text || "🔒 [Unable to decrypt message]" };
+      out.push({ ...m, payload });
+    } else {
+      out.push({ ...m, payload: { text: m.text || "", image: m.image, sos: m.kind === "sos" } });
+    }
+  }
+  return out;
+}
+
+async function sendEncryptedMessage(fromId, toId, payload){
+  const key = await deriveConvKey(fromId, toId);
+  const box = await aesEncrypt(key, payload);
+  const msgs = storage.get(MSG_KEY) || [];
+  const m = { id: uid("m"), from: fromId, to: toId, enc: box, ts: now() };
+  msgs.push(m);
+  storage.set(MSG_KEY, msgs);
+  const posted = await apiTry("/api/messages", { method:"POST", body: { to: toId, enc: box } });
+  if(posted && posted.message) upsertServerMessage(posted.message);
+  updateInboxBadge();
+  return m;
+}
+
+async function getDecryptedBetween(a,b){
+  const key = await deriveConvKey(a,b);
+  const local = storage.get(MSG_KEY) || [];
+  const remote = storage.get(DB.serverMsgsKey) || [];
+  const map = new Map();
+  [...remote, ...local].forEach(m => {
+    if(isDeletedForMe(m)) return;
+    if((m.from===a && m.to===b) || (m.from===b && m.to===a)) map.set(m.id, m);
+  });
+  const raw = Array.from(map.values()).sort((x,y)=>x.ts-y.ts);
+  const out = [];
+  for(const m of raw){
+    if(m.enc){
+      const payload = await aesDecrypt(key, m.enc) || { text:"🔒 [Unable to decrypt message]" };
+      out.push({ ...m, payload });
+    } else {
+      out.push({ ...m, payload: { text: m.text || "", image: m.image } });
+    }
+  }
+  return out;
+}
+
+function fileToCompressedBlob(file){
+  return fileToCompressedDataUrl(file).then((dataUrl) => {
+    const parts = String(dataUrl).split(",");
+    const head = parts[0] || "";
+    const body = parts[1] || "";
+    const mime = (head.match(/data:([^;]+)/) || [])[1] || "image/jpeg";
+    const bin = atob(body);
+    const arr = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  });
+}
+
+function fileToCompressedDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1000;
+        let { width, height } = img;
+        const scale = Math.min(1, MAX / Math.max(width, height));
+        width = Math.round(width * scale); height = Math.round(height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function sameDay(a, b){
+  const da = new Date(a), db = new Date(b);
+  return da.getFullYear()===db.getFullYear() && da.getMonth()===db.getMonth() && da.getDate()===db.getDate();
+}
+
+async function renderMessagesForUser(targetUserId){
+  const s = currentSession();
+  if(!s || !s.userId) return notice("Sign in first to message");
+  const target = getUserById(targetUserId) || { id: targetUserId, name: "User" };
+  const remoteUser = await apiTry("/api/users/" + encodeURIComponent(targetUserId));
+  if(remoteUser && remoteUser.user){
+    cacheUserFromServer(remoteUser.user);
+  }
+  const liveTarget = getUserById(targetUserId) || target;
+  const targetAvatar = getAvatarFor(liveTarget);
+
+  const wrap = make("div",{className:"chat-modal"});
+  const header = make("div",{className:"chat-header"});
+  const ava = make("div",{className:"chat-avatar"});
+  ava.innerHTML = targetAvatar;
+  header.appendChild(ava);
+  const sub = make("div",{className:"small-muted", style:"display:flex;align-items:center;gap:6px"});
+  sub.append("🔒", make("span",{className:"enc-badge"}, "End-to-end encrypted"));
+  if(isFamilyWith(targetUserId)) sub.appendChild(make("span",{className:"fam-pill"}, "Family"));
+  else sub.appendChild(make("span",{className:"small-muted"}, " · location hidden"));
+  const headInfo = make("div",{style:"flex:1;min-width:0"},
+    make("div",{style:"font-weight:700"}, liveTarget.name || liveTarget.email || "User"),
+    sub
+  );
+  header.appendChild(headInfo);
+  wrap.appendChild(header);
+
+  const convoWrap = make("div",{className:"chat-convo"});
+  wrap.appendChild(convoWrap);
+  const typingEl = make("div",{className:"chat-typing", style:"display:none"}, (liveTarget.name || "They") + " is typing…");
+
+  async function refreshConvo(){
+    convoWrap.innerHTML = "";
+    const remote = await apiTry("/api/messages?with=" + encodeURIComponent(targetUserId));
+    if(remote && remote.messages){
+      remote.messages.forEach(upsertServerMessage);
+    }
+    const msgs = await getDecryptedBetween(s.userId, targetUserId);
+    let lastTs = 0;
+    msgs.forEach(m=>{
+      if(!lastTs || !sameDay(lastTs, m.ts)){
+        convoWrap.appendChild(make("div",{className:"chat-day"}, new Date(m.ts).toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" })));
+      }
+      lastTs = m.ts;
+      const mine = m.from === s.userId;
+      const row = make("div",{className:"chat-msg " + (mine ? "mine" : "theirs")});
+      if(!mine){
+        const av = make("div",{className:"chat-avatar", style:"width:28px;height:28px;flex:0 0 28px;font-size:11px"});
+        av.innerHTML = targetAvatar;
+        row.appendChild(av);
+      }
+      const inner = make("div",{style:"display:flex;flex-direction:column;gap:3px"});
+      const p = m.payload || {};
+      if(p.image){
+        const img = make("img",{className:"chat-img", src:p.image, alt:"Shared image"});
+        img.onclick = () => openImagePreview(p.image);
+        inner.appendChild(img);
+      }
+      if(p.text){
+        const bub = make("div",{className:"chat-bubble"}, p.text);
+        bub.appendChild(make("span",{className:"chat-time"}, new Date(m.ts).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})));
+        inner.appendChild(bub);
+      } else {
+        inner.appendChild(make("div",{className:"chat-meta", style:"text-align:"+(mine?"right":"left")}, new Date(m.ts).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})));
+      }
+      row.appendChild(inner);
+      bindMessageGestures(row, m, mine, p);
+      convoWrap.appendChild(row);
+    });
+    convoWrap.appendChild(typingEl);
+    setTimeout(()=>{ convoWrap.scrollTop = convoWrap.scrollHeight; }, 30);
+  }
+
+  const fileInput = make("input",{type:"file", accept:"image/*", style:"display:none"});
+  fileInput.onchange = async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    try{
+      const dataUrl = await loadToDataUrlSafely(file);
+      await sendEncryptedMessage(s.userId, targetUserId, { image: dataUrl });
+      refreshConvo();
+    }catch(e){ console.error(e); notice("Could not attach image."); }
+    fileInput.value = "";
+  };
+  const attachBtn = make("button",{className:"chat-attach", title:"Attach image", type:"button"}, "📎");
+  attachBtn.onclick = () => fileInput.click();
+
+  const txt = make("textarea",{className:"input chat-input", placeholder:"Message", rows:1});
+  txt.setAttribute("aria-label","Message input");
+  txt.addEventListener("input", () => {
+    autoGrow(txt);
+    wsSend({ type:"typing", to: targetUserId });
+  });
+  const send = make("button",{className:"btn small chat-send", type:"button", title:"Send"}, "➤");
+  const doSend = async () => {
+    if(!txt.value.trim()) return;
+    await sendEncryptedMessage(s.userId, targetUserId, { text: txt.value.trim() });
+    txt.value = "";
+    autoGrow(txt);
+    refreshConvo();
+    txt.focus();
+  };
+  send.onclick = doSend;
+  txt.addEventListener("keydown", (e) => {
+    if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); doSend(); }
+    if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); doSend(); }
+  });
+
+  const inputRow = make("div",{className:"chat-composer"});
+  inputRow.appendChild(attachBtn);
+  inputRow.appendChild(txt);
+  inputRow.appendChild(send);
+  wrap.appendChild(inputRow);
+  wrap.appendChild(fileInput);
+
+  openChatUserId = targetUserId;
+  window.__refreshOpenChat = refreshConvo;
+  window.__showTyping = () => {
+    typingEl.style.display = "block";
+    convoWrap.scrollTop = convoWrap.scrollHeight;
+    clearTimeout(typingEl._t);
+    typingEl._t = setTimeout(()=>{ typingEl.style.display = "none"; }, 1800);
+  };
+
+  apiTry("/api/messages/read", { method:"POST", body: { with: targetUserId } });
+  refreshConvo();
+  const backdrop = showModal(wrap, { variant: "chat" });
+  backdrop.dataset.chatWith = targetUserId;
+  setTimeout(()=> txt.focus(), 80);
+  return backdrop;
+}
+
+async function renderFamilyChat(familyId){
+  const s = currentSession();
+  if(!s || !s.userId) return notice("Sign in first to message");
+  const fam = myFamilies().find(f => f.id === familyId) || (storage.get(DB.familiesKey)||[]).find(f => f.id === familyId);
+  if(!fam) return notice("Family not found");
+
+  const wrap = make("div",{className:"chat-modal"});
+  const header = make("div",{className:"chat-header"});
+  const ava = make("div",{className:"chat-avatar"}, "👨‍👩‍👧‍👦");
+  header.appendChild(ava);
+  const sub = make("div",{className:"small-muted", style:"display:flex;align-items:center;gap:6px"});
+  sub.append("🔒", make("span",{className:"enc-badge"}, "Family room · AES-GCM"), make("span",{className:"fam-pill"}, (fam.members||[]).length + " members"));
+  header.appendChild(make("div",{style:"flex:1;min-width:0"}, make("div",{style:"font-weight:700"}, fam.name), sub));
+  wrap.appendChild(header);
+
+  const convoWrap = make("div",{className:"chat-convo"});
+  wrap.appendChild(convoWrap);
+  const typingEl = make("div",{className:"chat-typing", style:"display:none"}, "Someone is typing…");
+
+  async function refreshConvo(){
+    convoWrap.innerHTML = "";
+    const remote = await apiTry("/api/messages?family=" + encodeURIComponent(familyId));
+    if(remote && remote.messages) remote.messages.forEach(upsertServerMessage);
+    const msgs = await getDecryptedFamily(familyId);
+    let lastTs = 0;
+    msgs.forEach(m => {
+      if(!lastTs || !sameDay(lastTs, m.ts)){
+        convoWrap.appendChild(make("div",{className:"chat-day"}, new Date(m.ts).toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" })));
+      }
+      lastTs = m.ts;
+      const p = m.payload || {};
+      if(m.kind === "sos" || p.sos){
+        convoWrap.appendChild(make("div",{className:"sos-banner"}, p.text || m.text || "SOS"));
+        return;
+      }
+      const mine = m.from === s.userId;
+      const sender = getUserById(m.from) || { name: "Member" };
+      const row = make("div",{className:"chat-msg " + (mine ? "mine" : "theirs")});
+      if(!mine){
+        const av = make("div",{className:"chat-avatar", style:"width:28px;height:28px;flex:0 0 28px;font-size:11px"});
+        av.innerHTML = getAvatarFor(sender);
+        row.appendChild(av);
+      }
+      const inner = make("div",{style:"display:flex;flex-direction:column;gap:3px"});
+      if(!mine) inner.appendChild(make("div",{className:"chat-meta"}, sender.name || "Member"));
+      if(p.image){
+        const img = make("img",{className:"chat-img", src:p.image, alt:"Shared image"});
+        img.onclick = () => openImagePreview(p.image);
+        inner.appendChild(img);
+      }
+      if(p.text){
+        const bub = make("div",{className:"chat-bubble"}, p.text);
+        bub.appendChild(make("span",{className:"chat-time"}, new Date(m.ts).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})));
+        inner.appendChild(bub);
+      } else {
+        inner.appendChild(make("div",{className:"chat-meta", style:"text-align:"+(mine?"right":"left")}, new Date(m.ts).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})));
+      }
+      row.appendChild(inner);
+      bindMessageGestures(row, m, mine, p);
+      convoWrap.appendChild(row);
+    });
+    convoWrap.appendChild(typingEl);
+    setTimeout(()=>{ convoWrap.scrollTop = convoWrap.scrollHeight; }, 30);
+  }
+
+  const fileInput = make("input",{type:"file", accept:"image/*", style:"display:none"});
+  fileInput.onchange = async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    try{
+      const dataUrl = await loadToDataUrlSafely(file);
+      await sendEncryptedFamilyMessage(familyId, { image: dataUrl });
+      refreshConvo();
+    }catch(e){ notice("Could not attach image."); }
+    fileInput.value = "";
+  };
+  const attachBtn = make("button",{className:"chat-attach", title:"Attach image", type:"button"}, "📎");
+  attachBtn.onclick = () => fileInput.click();
+  const txt = make("textarea",{className:"input chat-input", placeholder:"Message the family", rows:1});
+  txt.addEventListener("input", () => { autoGrow(txt); wsSend({ type:"typing", familyId }); });
+  const send = make("button",{className:"btn small chat-send", type:"button", title:"Send"}, "➤");
+  const doSend = async () => {
+    if(!txt.value.trim()) return;
+    await sendEncryptedFamilyMessage(familyId, { text: txt.value.trim() });
+    txt.value = ""; autoGrow(txt); refreshConvo(); txt.focus();
+  };
+  send.onclick = doSend;
+  txt.addEventListener("keydown", (e) => {
+    if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); doSend(); }
+  });
+  const inputRow = make("div",{className:"chat-composer"});
+  inputRow.append(attachBtn, txt, send);
+  wrap.append(inputRow, fileInput);
+
+  openChatUserId = null;
+  openChatFamilyId = familyId;
+  window.__refreshOpenChat = refreshConvo;
+  window.__showTyping = () => {
+    typingEl.style.display = "block";
+    convoWrap.scrollTop = convoWrap.scrollHeight;
+    clearTimeout(typingEl._t);
+    typingEl._t = setTimeout(()=>{ typingEl.style.display = "none"; }, 1800);
+  };
+  refreshConvo();
+  const backdrop = showModal(wrap, { variant: "chat" });
+  setTimeout(()=> txt.focus(), 80);
+  return backdrop;
+}
+
+function autoGrow(el){
+  el.style.height = "auto";
+  el.style.height = Math.min(Math.max(el.scrollHeight, 48), 120) + "px";
+}
+
+async function loadToDataUrlSafely(file){
+  try{ return await fileToCompressedDataUrl(file); }
+  catch(e){ return await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
+}
+
+async function uploadMedia(file, filename){
+  const s = currentSession();
+  const token = (s && s.sessionToken) || localStorage.getItem("f360_otpsess") || "";
+  const headers = {};
+  if(token) headers["authorization"] = "Bearer " + token;
+  const blob = file instanceof Blob ? file : new Blob([file]);
+  headers["content-type"] = blob.type || "application/octet-stream";
+  if(filename) headers["x-file-name"] = encodeURIComponent(filename);
+  const res = await fetch("/api/media", { method: "POST", headers, body: blob });
+  const j = await res.json().catch(() => ({}));
+  if(!res.ok) throw new Error((j && j.error) || "upload failed");
+  return j;
+}
+
+function getAvatarFor(u){
+  const dataUrl = getProfileImageForUser(u.id);
+  if(dataUrl) return `<img src="${dataUrl}" alt=""/>`;
+  const initials = ((u.name||"U").split(" ").map(x=>x[0]).slice(0,2).join("")).toUpperCase();
+  return initials || "U";
+}
+
+function openImagePreview(src){
+  const wrap = make("div",{className:"centered", style:"flex-direction:column;gap:12px"});
+  const img = make("img",{src, style:"max-width:92vw;max-height:70vh;border-radius:10px"});
+  const dl = make("button",{className:"btn small secondary"}, "⬇ Download");
+  dl.onclick = () => downloadDataUrl(src, "image.jpg");
+  const close = make("button",{className:"btn small"}, "Close");
+  close.onclick = closeModal;
+  wrap.appendChild(img);
+  wrap.appendChild(make("div",{className:"row", style:"gap:8px"}, dl, close));
+  showModal(wrap);
+}
+
+function renderInbox(){
+  const s = currentSession(); if(!s || !s.userId) return notice("Sign in first");
+  const wrap = make("div",{style:"min-width:320px;max-width:720px;display:flex;flex-direction:column;gap:12px"});
+  wrap.appendChild(make("h3",{}, "Inbox"));
+
+  const list = make("div",{style:"display:flex;flex-direction:column;gap:8px;max-height:400px;overflow:auto"});
+
+  function paint(threads){
+    list.innerHTML = "";
+    Object.keys(threads).sort((a,b)=> (threads[b].last?.ts||0)-(threads[a].last?.ts||0)).forEach(otherId=>{
+      const t = threads[otherId];
+      const row = make("div",{className:"family-card", style:"display:flex;justify-content:space-between;align-items:center;gap:8px"});
+      let title, open;
+      if(t.familyId || String(otherId).startsWith("fam:")){
+        const fid = t.familyId || otherId.slice(4);
+        const fam = (storage.get(DB.familiesKey)||[]).find(f => f.id === fid);
+        title = (fam && fam.name) || "Family room";
+        open = () => { closeModal(); renderFamilyChat(fid); };
+      } else {
+        const u = getUserById(otherId) || {name: "User"};
+        title = u.name || u.email || ("User "+otherId.slice(-4));
+        open = () => { closeModal(); renderMessagesForUser(otherId); };
+      }
+      const left = make("div",{}, make("div",{}, title), make("div",{className:"small-muted"}, `${t.count} messages • ${t.last ? new Date(t.last.ts).toLocaleString() : ''}`));
+      const actions = make("div",{style:"display:flex;align-items:center;gap:8px"});
+      if(t.unread > 0){
+        actions.appendChild(make("div",{style:"min-width:26px;height:26px;border-radius:14px;background:var(--danger);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700"}, String(t.unread)));
+      }
+      const openBtn = make("button",{className:"btn small"}, "Open");
+      openBtn.onclick = open;
+      actions.append(openBtn);
+      row.append(left, actions);
+      list.appendChild(row);
+    });
+    if(Object.keys(threads).length === 0) list.appendChild(make("div",{className:"small-muted"}, "No messages yet. Use 🔍 to find someone by name or phone."));
+  }
+
+  const msgs = storage.get(MSG_KEY) || [];
+  const remote = storage.get(DB.serverMsgsKey) || [];
+  const all = [...msgs, ...remote];
+  const threads = {};
+  all.forEach(m => {
+    if(m.familyId){
+      const key = "fam:" + m.familyId;
+      threads[key] = threads[key] || {unread:0, last:null, count:0, familyId: m.familyId};
+      threads[key].count += 1;
+      if(m.from !== s.userId && !m.readAt) threads[key].unread += 1;
+      threads[key].last = threads[key].last && threads[key].last.ts > m.ts ? threads[key].last : m;
+      return;
+    }
+    if(m.to === s.userId) {
+      const other = m.from;
+      threads[other] = threads[other] || {unread:0, last:null, count:0};
+      threads[other].unread += m.readAt ? 0 : 1;
+      threads[other].count += 1;
+      threads[other].last = threads[other].last && threads[other].last.ts > m.ts ? threads[other].last : m;
+    } else if(m.from === s.userId && m.to){
+      const other = m.to;
+      threads[other] = threads[other] || {unread:0, last:null, count:0};
+      threads[other].count += 1;
+      threads[other].last = threads[other].last && threads[other].last.ts > m.ts ? threads[other].last : m;
+    }
+  });
+  paint(threads);
+
+  apiTry("/api/inbox").then(j => {
+    if(!j || !j.threads) return;
+    j.threads.forEach(t => {
+      if(!getUserById(t.otherId)) cacheUserFromServer({ id: t.otherId, name: t.name, inFamily: t.inFamily });
+    });
+  });
+
+  wrap.appendChild(list);
+  const findBtn = make("button",{className:"btn small"}, "Find people");
+  findBtn.onclick = () => { closeModal(); renderFamilyList(); };
+  wrap.appendChild(make("div",{className:"row", style:"justify-content:flex-end;gap:8px"}, findBtn, make("button",{className:"btn small secondary", onclick:()=>{ closeModal(); }}, "Close")));
+  showModal(wrap);
+}
+
+async function updateInboxBadge(){
+  const badge = qs("#inbox-badge");
+  if(!badge) return;
+  const s = currentSession(); if(!s || !s.userId){ badge.style.display = "none"; return; }
+  const j = await apiTry("/api/inbox");
+  let unread = 0;
+  if(j && typeof j.unread === "number") unread = j.unread;
+  else {
+    const msgs = storage.get(MSG_KEY) || [];
+    unread = msgs.filter(m => m.to === s.userId && !m.readAt).length;
+  }
+  if(unread > 0){ badge.style.display = "inline-flex"; badge.textContent = unread > 99 ? "99+" : String(unread); }
+  else { badge.style.display = "none"; }
+}
+
+function profileKeyForUser(uid){ return `f360_profile_${uid}`; }
+function saveProfileImageForUser(uid, dataUrl){ try{ localStorage.setItem(profileKeyForUser(uid), dataUrl); }catch(e){ console.warn("profile save failed", e); } }
+function getProfileImageForUser(uid){ return localStorage.getItem(profileKeyForUser(uid)) || ""; }
+
+function updateProfileThumb(){
+  const img = qs("#acct-avatar");
+  const s = currentSession();
+  if(!img) return;
+  if(!s || !s.userId){ img.src = ""; return; }
+  const dataUrl = getProfileImageForUser(s.userId);
+  if(dataUrl){ img.src = dataUrl; }
+  else {
+    const u = getUserById(s.userId);
+    const initials = (u?.name || "U").split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='88' height='88'><rect width='100%' height='100%' fill='#233b3a'/><text x='50%' y='54%' font-size='32' fill='#fff' text-anchor='middle' font-family='Arial'>${initials}</text></svg>`;
+    img.src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }
+}
+
+function initProfileInput(){
+  const input = qs("#profile-input");
+  if(!input) return;
+  input.onchange = (ev) => {
+    const file = input.files && input.files[0];
+    if(!file) return;
+    const s = currentSession(); if(!s || !s.userId) return notice("Sign in first");
+    const reader = new FileReader();
+    reader.onload = async () => {
+      let dataUrl = reader.result;
+      try{ dataUrl = await fileToCompressedDataUrl(file); }catch(e){}
+      saveProfileImageForUser(s.userId, dataUrl);
+      updateProfileThumb();
+      updateFamilyMarkers();
+      paintAccountDrawer();
+      apiTry("/api/me/profile", { method:"POST", body: { image: dataUrl } });
+    };
+    reader.readAsDataURL(file);
+  };
+}
+
+function pushLocationToHistory(userId, lat, lng, type, ts){
+  const users = storage.get(DB.usersKey) || [];
+  const u = users.find(x=>x.id===userId);
+  if(!u) return;
+  if(!u.locationHistory) u.locationHistory = [];
+  const t = ts || now();
+  const last = u.locationHistory[u.locationHistory.length-1];
+  if(last && Math.abs((last.ts||0) - t) < 5000 && Math.abs(last.lat-lat) < 1e-6 && Math.abs(last.lng-lng) < 1e-6) return;
+  u.locationHistory.push({lat,lng,ts: t, type: type || "minute"});
+  if(u.locationHistory.length > 2000) u.locationHistory = u.locationHistory.slice(-2000);
+  storage.set(DB.usersKey, users);
+}
+
+function haversineKm(a, b){
+  const R = 6371;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+
+function clearTrail(){
+  if(!map || !trailGroup) return;
+  try{ map.removeLayer(trailGroup); }catch(e){}
+  trailGroup = null;
+}
+
+function drawTrailOnMap(hist, name){
+  if(!map) return notice("Map is still loading.");
+  const pts = (hist || []).filter(h => Number.isFinite(h.lat) && Number.isFinite(h.lng)).slice().sort((a,b)=>(a.ts||0)-(b.ts||0));
+  if(pts.length < 1) return notice("No trail points to map yet. Keep Track On — a pin is saved every minute.");
+  clearTrail();
+  trailGroup = L.layerGroup();
+  const latlngs = pts.map(h => [h.lat, h.lng]);
+  if(latlngs.length >= 2){
+    L.polyline(latlngs, { color: "#2dd4bf", weight: 4, opacity: 0.9 }).addTo(trailGroup);
+  }
+  const start = pts[0], end = pts[pts.length-1];
+  L.circleMarker([start.lat, start.lng], { radius: 7, color: "#efe7dc", fillColor: "#c9a227", fillOpacity: 1, weight: 2 }).bindPopup("Start · " + new Date(start.ts).toLocaleString()).addTo(trailGroup);
+  L.circleMarker([end.lat, end.lng], { radius: 8, color: "#042022", fillColor: "#2dd4bf", fillOpacity: 1, weight: 2 }).bindPopup((name || "Now") + " · " + new Date(end.ts).toLocaleString()).addTo(trailGroup);
+  trailGroup.addTo(map);
+  try{
+    if(latlngs.length === 1) map.flyTo(latlngs[0], 16);
+    else map.fitBounds(L.latLngBounds(latlngs), { padding: [36, 36], maxZoom: 16 });
+  }catch(e){}
+}
+
+async function drawUserTrail(userId, fromTs){
+  const u = getUserById(userId);
+  if(!u) return;
+  let hist = u.locationHistory || [];
+  const j = await apiTry("/api/users/" + encodeURIComponent(userId) + "/history" + (fromTs ? ("?from=" + fromTs) : ""));
+  if(j && j.history){ hist = j.history; u.locationHistory = j.history; saveUser(u); }
+  if(fromTs) hist = hist.filter(h => (h.ts||0) >= fromTs);
+  drawTrailOnMap(hist, u.name);
+}
+
+function recordHistoryPoint(lat, lng, type){
+  const s = currentSession(); if(!s) return;
+  const u = getUserById(s.userId);
+  if(u && memberPrefs(u).recordHistory === false) return;
+  const ts = now();
+  pushLocationToHistory(s.userId, lat, lng, type || "minute", ts);
+  apiTry("/api/location", { method:"POST", body: { lat, lng, type: type || "minute", record: true } });
+}
+
+let historyPrimed = false;
+function startHistoryRecorder(){
+  stopHistoryRecorder();
+  historyPrimed = false;
+  const snap = () => {
+    if(!trackingEnabled) return;
+    const s = currentSession(); if(!s) return;
+    const u = getUserById(s.userId);
+    const loc = lastFix || (u && u.lastLocation);
+    if(!loc) return;
+    historyPrimed = true;
+    recordHistoryPoint(loc.lat, loc.lng, "minute");
+  };
+  historyTimer = setInterval(snap, 60 * 1000);
+}
+
+function stopHistoryRecorder(){
+  if(historyTimer){ clearInterval(historyTimer); historyTimer = null; }
+}
+
+async function renderHistoryForUser(userId){
+  if(!isFamilyWith(userId)) return notice("Location history is only visible for people in your family.");
+  const u = getUserById(userId);
+  if(!u) return notice("User not found");
+  const s = currentSession();
+  const self = !!(s && s.userId === userId);
+  if(!self && memberPrefs(u).allowHistory === false){
+    return notice("This member does not share location history.");
+  }
+  const wrap = make("div",{className:"hist-app"});
+  wrap.appendChild(make("div",{className:"help-kicker"}, self ? "Your trail" : "Family trail"));
+  wrap.appendChild(make("h3",{}, u.name || u.email || "User"));
+  wrap.appendChild(make("p",{className:"small-muted"}, "While Track is On, a pin is saved every minute. Map the path, filter by time, or clear it."));
+
+  const range = make("select",{className:"input"});
+  [["60","Last hour"],["today","Today"],["1440","Last 24 hours"],["10080","Last 7 days"],["all","All recorded"]].forEach(([v,l]) => range.appendChild(make("option",{value:v}, l)));
+  range.value = "1440";
+  wrap.appendChild(make("label",{}, "Time range"));
+  wrap.appendChild(range);
+
+  const stats = make("div",{className:"privacy-note"});
+  wrap.appendChild(stats);
+  const list = make("div",{className:"hist-list"});
+  wrap.appendChild(list);
+
+  function fromTs(){
+    const v = range.value;
+    const t = now();
+    if(v === "all") return 0;
+    if(v === "today"){ const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); }
+    return t - Number(v) * 60 * 1000;
+  }
+  function filtered(src){
+    const f = fromTs();
+    return (src || []).filter(h => Number.isFinite(h.lat) && Number.isFinite(h.lng) && (!f || (h.ts||0) >= f));
+  }
+  function paint(src){
+    const hist = filtered(src).slice().sort((a,b)=>(a.ts||0)-(b.ts||0));
+    list.innerHTML = "";
+    if(!hist.length){
+      stats.textContent = "No points in this range. Turn Track On and wait a minute — or pick a wider range.";
+      list.appendChild(make("div",{className:"small-muted"}, "Nothing recorded yet."));
+      return hist;
+    }
+    let km = 0;
+    for(let i=1;i<hist.length;i++) km += haversineKm(hist[i-1], hist[i]);
+    stats.textContent = hist.length + " points · " + new Date(hist[0].ts).toLocaleString() + " → " + new Date(hist[hist.length-1].ts).toLocaleString() + " · ~" + (km < 1 ? (km*1000).toFixed(0)+" m" : km.toFixed(2)+" km");
+    hist.slice().reverse().forEach(h => {
+      const row = make("div",{className:"family-card hist-row"});
+      const left = make("div",{}, make("div",{}, new Date(h.ts).toLocaleString()), make("div",{className:"small-muted"}, (h.type || "pin") + " · " + Number(h.lat).toFixed(5) + ", " + Number(h.lng).toFixed(5)));
+      const goto = make("button",{className:"btn small secondary", type:"button"}, "Go");
+      goto.onclick = () => { if(map) map.flyTo([h.lat,h.lng], 16); closeModal(); };
+      row.append(left, goto);
+      list.appendChild(row);
+    });
+    return hist;
+  }
+
+  let cache = u.locationHistory || [];
+  paint(cache);
+
+  const actions = make("div",{className:"row", style:"flex-wrap:wrap;gap:8px;margin-top:8px"});
+  const mapBtn = make("button",{className:"btn", type:"button"}, "Map this trail");
+  mapBtn.onclick = () => {
+    const hist = paint(cache);
+    closeModal();
+    drawTrailOnMap(hist, u.name);
+  };
+  const hideBtn = make("button",{className:"btn small secondary", type:"button"}, "Hide trail");
+  hideBtn.onclick = () => { clearTrail(); notice("Trail hidden."); };
+  actions.append(mapBtn, hideBtn);
+  if(self){
+    const recNow = make("button",{className:"btn small secondary", type:"button"}, "Save pin now");
+    recNow.onclick = () => {
+      const loc = lastFix || u.lastLocation;
+      if(!loc) return notice("No GPS yet. Turn Track On first.");
+      recordHistoryPoint(loc.lat, loc.lng, "manual");
+      cache = (getUserById(userId).locationHistory || cache);
+      paint(cache);
+    };
+    const clearRange = make("button",{className:"btn small secondary", type:"button"}, "Clear this range");
+    clearRange.onclick = async () => {
+      if(!await ask("Delete the points in this time range from your history?")) return;
+      const from = fromTs();
+      const to = now();
+      const wipeAll = !from;
+      const j = await apiTry("/api/me/history", { method:"DELETE", body: wipeAll ? {} : { from, to } });
+      if(wipeAll) u.locationHistory = [];
+      else u.locationHistory = (u.locationHistory || []).filter(h => (h.ts||0) < from || (h.ts||0) > to);
+      saveUser(u);
+      cache = u.locationHistory;
+      paint(cache);
+      clearTrail();
+      notice(j ? "History updated." : "Cleared on this device.");
+    };
+    const clearAll = make("button",{className:"btn small", type:"button", style:"background:var(--danger);color:#fff"}, "Clear all history");
+    clearAll.onclick = async () => {
+      if(!await ask("Erase your entire location history? This cannot be undone.")) return;
+      await apiTry("/api/me/history", { method:"DELETE", body: {} });
+      u.locationHistory = [];
+      saveUser(u);
+      cache = [];
+      paint(cache);
+      clearTrail();
+    };
+    actions.append(recNow, clearRange, clearAll);
+  }
+  wrap.appendChild(actions);
+
+  range.onchange = () => paint(cache);
+  showModal(wrap);
+  apiTry("/api/users/" + encodeURIComponent(userId) + "/history").then(j => {
+    if(j && j.history){
+      u.locationHistory = j.history;
+      saveUser(u);
+      cache = j.history;
+      paint(cache);
+    }
+  });
+}
+
+function updateFamilyMarkers(){
+  const s = currentSession(); if(!s) return;
+  const families = storage.get(DB.familiesKey) || [];
+  const myFams = families.filter(f => Array.isArray(f.members) && f.members.includes(s.userId));
+  const memberIds = new Set(myFams.flatMap(f=>f.members));
+
+  markers = markers || {};
+
+  if(map){
+    memberIds.forEach(id=>{
+      const u = getUserById(id);
+      if(!u) return;
+      const prefs = memberPrefs(u);
+      if(s.userId !== id && prefs.appearOnMap === false){
+        if(markers[id]){ try{ map.removeLayer(markers[id].marker); }catch(e){} delete markers[id]; }
+        return;
+      }
+      if(u.lastLocation){
+        const lng = u.lastLocation.lng, lat = u.lastLocation.lat;
+
+        if(!markers[id]){
+          const wrapper = document.createElement("div");
+          wrapper.className = "member-marker-wrap";
+
+          const imgWrap = document.createElement("div");
+          imgWrap.style.width = "44px";
+          imgWrap.style.height = "44px";
+          imgWrap.style.borderRadius = "50%";
+          imgWrap.style.overflow = "hidden";
+          imgWrap.style.boxShadow = "0 6px 14px rgba(0,0,0,0.45)";
+          imgWrap.style.border = "3px solid rgba(0,0,0,0.45)";
+          imgWrap.style.display = "flex";
+          imgWrap.style.alignItems = "center";
+          imgWrap.style.justifyContent = "center";
+          imgWrap.style.background = id===s.userId ? "var(--accent)" : "#ffb86b";
+
+          const pImg = getProfileImageForUser(id);
+          if(pImg){
+            const img = document.createElement("img");
+            img.src = pImg;
+            img.style.width = "100%";
+            img.style.height = "100%";
+            img.style.objectFit = "cover";
+            img.style.display = "block";
+            imgWrap.appendChild(img);
+          } else {
+            const initials = (u?.name || "U").split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();
+            imgWrap.innerHTML = `<div style="color:#071018;font-weight:800">${initials}</div>`;
+          }
+
+          const label = document.createElement("div");
+          label.className = "member-label";
+          label.textContent = u.name || u.email || ("User " + id.slice(-4));
+          label.setAttribute("data-user-id", id);
+
+          wrapper.appendChild(imgWrap);
+          wrapper.appendChild(label);
+
+          const icon = L.divIcon({
+            html: wrapper,
+            className: '',
+            iconSize: [180,56],
+            iconAnchor: [22,22]
+          });
+
+          const marker = L.marker([lat, lng], { icon }).addTo(map);
+
+          marker.on('click', () => { focusMember(id); });
+          wrapper.addEventListener("click", (ev) => { ev.stopPropagation(); focusMember(id); });
+
+          markers[id] = { marker, el: wrapper };
+        } else {
+          try{ markers[id].marker.setLatLng([lat, lng]); }catch(e){ console.warn("Failed to update marker position", e); }
+          const pImg = getProfileImageForUser(id);
+          if(pImg && markers[id].el){
+            const imgWrap = markers[id].el.querySelector('div');
+            if(imgWrap){
+              imgWrap.innerHTML = `<img src="${pImg}" style="width:100%;height:100%;object-fit:cover;display:block"/>`;
+            }
+          }
+        }
+      } else {
+        if(markers[id]){
+          try{ map.removeLayer(markers[id].marker); }catch(e){}
+          delete markers[id];
+        }
+      }
+    });
+
+    Object.keys(markers).forEach(id=>{
+      if(!memberIds.has(id)){ try{ map.removeLayer(markers[id].marker); }catch(e){}; delete markers[id]; }
+    });
+  }
+
+  const listEl = qs("#member-list");
+  if(listEl){
+    listEl.innerHTML = "";
+    const filter = ((qs("#drawer-find") && qs("#drawer-find").value) || "").trim().toLowerCase();
+    const filterDigits = digits(filter);
+
+    const famHeader = make("div",{className:"small-muted", style:"padding:4px;font-weight:700;color:#e6eef0"}, "My Families");
+    listEl.appendChild(famHeader);
+    if(myFams.length === 0){
+      listEl.appendChild(make("div",{className:"small-muted", style:"padding:2px 4px 6px"}, "No families yet."));
+    }
+    myFams.forEach(f=>{
+      const crow = make("div",{className:"family-card", style:"display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px"});
+      crow.appendChild(make("div",{style:"min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600"}, f.name + (f.members.length ? ` (${f.members.length})` : "")));
+      const chat = make("button",{className:"btn small", style:"flex:0 0 auto;margin:0;padding:6px 8px", type:"button"}, "💬");
+      chat.title = "Encrypted family chat";
+      chat.onclick = () => { closeDrawer(); renderFamilyChat(f.id); };
+      const share = make("button",{className:"btn small", style:"flex:0 0 auto;margin:0;padding:6px 8px", type:"button"}, "🔗");
+      share.title = "Share invite / QR";
+      share.onclick = () => openShareModal(f);
+      const gear = make("button",{className:"btn small", style:"flex:0 0 auto;margin:0;padding:6px 8px", type:"button"}, "⚙");
+      gear.title = "Family settings & roles";
+      gear.onclick = () => { closeDrawer(); renderFamilyAdmin(uiBag(), f.id); };
+      crow.appendChild(chat);
+      crow.appendChild(share);
+      crow.appendChild(gear);
+      listEl.appendChild(crow);
+    });
+
+    if(myFams.length){
+      const sep = document.createElement("div");
+      sep.className = "small-muted";
+      sep.style.cssText = "padding:6px 4px 2px;font-weight:700;color:#e6e9ed;border-top:1px solid rgba(255,255,255,0.04);margin-top:4px";
+      sep.textContent = "Members";
+      listEl.appendChild(sep);
+    }
+
+    const memberObjs = Array.from(memberIds).map(id => getUserById(id)).filter(Boolean);
+    const sObj = currentSession();
+    memberObjs.sort((a,b)=>{
+      if(a.id === sObj.userId) return -1;
+      if(b.id === sObj.userId) return 1;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+    memberObjs.forEach(u=>{
+      if(filter){
+        const blob = `${u.name||""} ${u.email||""} ${u.phone||""}`.toLowerCase();
+        const ph = digits(u.phone);
+        if(!blob.includes(filter) && !(filterDigits && ph.includes(filterDigits))) return;
+      }
+      const row = make("div",{className:"member-row"});
+      const dotColor = u.lastLocation ? "green" : "#ff6b6b";
+      const dot = make("div",{className:"status-dot", title: u.lastLocation ? "Active" : "Inactive", style:`background:${dotColor}`});
+      const nameBtn = make("button",{className:"member-name", type:"button"}, u.name || u.email || ("User " + u.id.slice(-4)));
+      nameBtn.onclick = () => { focusMember(u.id); };
+      const meta = make("div",{className:"member-meta small-muted"}, u.lastLocation ? new Date(u.lastLocation.ts).toLocaleString() : "No location shared");
+
+      const msgBtn = make("button",{className:"small-btn", type:"button", style:"margin-left:6px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted);padding:6px 8px;border-radius:8px"}, "💬");
+      msgBtn.onclick = () => { renderMessagesForUser(u.id); };
+
+      const histBtn = make("button",{className:"small-btn", type:"button", style:"margin-left:6px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted);padding:6px 8px;border-radius:8px"}, "🕘");
+      histBtn.title = "View location history";
+      histBtn.onclick = () => { renderHistoryForUser(u.id); };
+
+      const actionsWrap = make("div",{className:"row", style:"gap:8px;align-items:center"});
+      actionsWrap.append(msgBtn, histBtn);
+
+      row.append(dot, nameBtn, meta, actionsWrap);
+      listEl.appendChild(row);
+    });
+
+    if(filter && filter.length >= 2){
+      const more = make("button",{className:"btn small secondary", type:"button"}, `Search directory for “${filter}”`);
+      more.onclick = () => { closeDrawer(); renderFamilyList(filter); };
+      listEl.appendChild(more);
+    }
+  }
+
+  const sdiv = qs("#status");
+  if(sdiv){
+    const live = socket && socket.readyState === 1 ? " • live" : (serverOk ? " • online" : "");
+    sdiv.textContent = `Signed in as ${getUserById(s.userId)?.name || "User"} • Families: ${myFams.length}${live}`;
+  }
+  updateLivePill();
+  updateInboxBadge();
+}
+
+function publishLocation(lat, lng, type){
+  const s = currentSession(); if(!s) return;
+  lastFix = { lat, lng, ts: now() };
+  const users = storage.get(DB.usersKey) || [];
+  let u = users.find(x=>x.id===s.userId);
+  if(u){
+    u.lastLocation = { lat, lng, ts: lastFix.ts };
+    saveUser(u);
+  } else {
+    u = { id: s.userId, name: "User", lastLocation: {lat, lng, ts: lastFix.ts}, locationHistory: [] };
+    saveUser(u);
+  }
+  wsSend({ type:"location", lat, lng, kind: type || "live" });
+  apiTry("/api/location", { method:"POST", body: { lat, lng, type: type || "live" } });
+  if(trackingEnabled && !historyPrimed){
+    historyPrimed = true;
+    recordHistoryPoint(lat, lng, "minute");
+  }
+  updateFamilyMarkers();
+}
+
+function startTracking(){
+  if(trackingEnabled) return;
+  trackingEnabled = true;
+  const btn = qs("#btn-toggle-tracking");
+  if(btn){ btn.textContent = "Track On"; btn.classList.add("on"); btn.style.color = ""; }
+  navigator.permissions && navigator.permissions.query({name:'geolocation'}).catch(()=>null);
+  if("geolocation" in navigator){
+    watchId = navigator.geolocation.watchPosition(pos => {
+      publishLocation(pos.coords.latitude, pos.coords.longitude, "live");
+    }, err => {
+      const demoLat = 39.7392 + (Math.random()-0.5)*0.02;
+      const demoLng = -104.9903 + (Math.random()-0.5)*0.02;
+      publishLocation(demoLat, demoLng, "demo");
+      console.warn("Geolocation error", err);
+    }, {enableHighAccuracy:true, maximumAge:2000, timeout:10000});
+  } else {
+    notice("Geolocation not available — running demo simulation.");
+  }
+  startHistoryRecorder();
+}
+
+function stopTracking(){
+  trackingEnabled = false;
+  stopHistoryRecorder();
+  const btn = qs("#btn-toggle-tracking");
+  if(btn){ btn.textContent = "Track Off"; btn.classList.remove("on"); btn.style.color = ""; }
+  if(watchId && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+}
+
+function updateUIForSession(){
+  const s = currentSession();
+  const status = qs("#status");
+  if(status){
+    if(s && s.userId) status.textContent = "Signed in as " + (getUserById(s.userId)?.name || "User");
+    else status.textContent = "Not signed in";
+  }
+  const track = qs("#btn-toggle-tracking");
+  if(track){
+    track.textContent = trackingEnabled ? "Track On" : "Track Off";
+    track.classList.toggle("on", !!trackingEnabled);
+  }
+  updateProfileThumb();
+  updateInboxBadge();
+  if(qs("#account-drawer") && qs("#account-drawer").classList.contains("open")) paintAccountDrawer();
+}
+
+function centerOnMe(){
+  const s = currentSession(); if(!s) return;
+  const u = getUserById(s.userId);
+  if(u && u.lastLocation) map.flyTo([u.lastLocation.lat, u.lastLocation.lng], 14);
+  else notice("No location shared yet. Enable tracking first.");
+}
+
+function closeFeedPanel(){
+  const panel = qs("#feed-panel");
+  document.body.classList.remove("feed-open");
+  if(panel){ panel.classList.remove("open"); panel.setAttribute("aria-hidden","true"); }
+  const btn = qs("#btn-community");
+  if(btn) btn.classList.remove("on");
+  window.__refreshFeed = null;
+  setTimeout(()=>{ try{ if(window.reflowMap) window.reflowMap(); }catch(e){} }, 280);
+}
+function openFeedPanel(opts){
+  if(!currentSession()) return notice("Sign in first");
+  closeDrawer();
+  closeAccountDrawer();
+  const panel = qs("#feed-panel");
+  const root = qs("#feed-root");
+  if(!panel || !root){
+    return renderCommunityFeed(Object.assign({}, uiBag(), { openFeedPanel: null }), opts || {});
+  }
+  document.body.classList.add("feed-open");
+  panel.classList.add("open");
+  panel.setAttribute("aria-hidden","false");
+  const btn = qs("#btn-community");
+  if(btn) btn.classList.add("on");
+  mountCommunityFeed(uiBag(), root, opts || {});
+  setTimeout(()=>{ try{ if(window.reflowMap) window.reflowMap(); }catch(e){} }, 60);
+}
+function toggleFeedPanel(){
+  const panel = qs("#feed-panel");
+  if(panel && panel.classList.contains("open")) closeFeedPanel();
+  else openFeedPanel();
+}
+
+function uiBag(){
+  return {
+    make, api, apiTry, currentSession, setSession, cacheUserFromServer, closeModal, updateUIForSession,
+    showModal, getAvatarFor, getUserById, myFamilies, qs, openShareModal, renderFamilyChat,
+    notice, ask, askText, openFeedPanel, closeFeedPanel, toggleFeedPanel, mountCommunityFeed,
+    uploadMedia, fileToCompressedBlob, loadToDataUrlSafely, fileToCompressedDataUrl
+  };
+}
+
+function bindUI(){
+  bindDrawer();
+  bindMapTools();
+  const communityBtn = qs("#btn-community");
+  if(communityBtn) communityBtn.onclick = () => toggleFeedPanel();
+  const searchBtn = qs("#btn-search");
+  if(searchBtn) searchBtn.onclick = () => renderFamilyList();
+  const helpBtn = qs("#btn-help");
+  if(helpBtn) helpBtn.onclick = () => renderHelp("welcome");
+  const sosBtn = qs("#btn-sos");
+  if(sosBtn) sosBtn.onclick = () => sendSos();
+  const trackBtn = qs("#btn-toggle-tracking");
+  if(trackBtn) trackBtn.onclick = () => {
+    if(!currentSession()){ notice("Sign in first"); return; }
+    if(trackingEnabled) stopTracking(); else { renderDisclaimer(()=>{ startTracking(); }); }
+  };
+
+  const inboxBtn = qs("#btn-inbox");
+  if(inboxBtn) inboxBtn.onclick = () => { renderInbox(); };
+
+  const drawerFind = qs("#drawer-find");
+  if(drawerFind){
+    drawerFind.addEventListener("input", debounce(() => updateFamilyMarkers(), 180));
+  }
+
+  initProfileInput();
+  document.addEventListener("keydown", (e) => {
+    if(e.key === "Escape"){
+      hideMsgMenu();
+      hidePinSheet();
+      closeDrawer();
+      closeAccountDrawer();
+      closeFeedPanel();
+      document.querySelectorAll(".feed-lightbox").forEach(n => n.remove());
+    }
+  });
+  setInterval(updateFamilyMarkers, 2000);
+  setInterval(updateInboxBadge, 4000);
+  setInterval(() => { if(currentSession()) syncFromServer(); }, 12000);
+}
+
+function dismissSplash(){
+  const overlay = document.getElementById("splash-overlay");
+  if(!overlay) return;
+  overlay.classList.add("hidden");
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.style.display = "none";
+  overlay.style.pointerEvents = "none";
+  overlay.style.zIndex = "0";
+}
+
+function showSplashThenBoot(){
+  const overlay = document.getElementById("splash-overlay");
+  const btn = document.getElementById("splash-continue");
+  let done = false;
+
+  function finishSplash(){
+    if(done) return;
+    done = true;
+    showLegalGate().then(() => {
+      dismissSplash();
+      try{ boot(); }catch(e){ console.error(e); }
+    }).catch(e => {
+      console.error(e);
+      dismissSplash();
+      try{ boot(); }catch(e2){ console.error(e2); }
+    });
+  }
+
+  if(btn) btn.onclick = () => { finishSplash(); };
+  setTimeout(()=>{ finishSplash(); }, 5600);
+}
+
+function boot(){
+  initMap();
+  bindUI();
+  updateUIForSession();
+  updateLivePill();
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("/sw.js").catch(()=>{});
+    navigator.serviceWorker.addEventListener("message", (ev) => {
+      const d = ev.data || {};
+      if(d.type === "open" && d.url) openFromNotificationUrl(d.url);
+    });
+  }
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); window.__deferredPrompt = e; });
+  apiTry("/api/config").then(j => { if(j) serverConfig = Object.assign(serverConfig, j); });
+
+  try{
+    const params = new URLSearchParams(window.location.search);
+    const pre = params.get("invite");
+    if(pre){ renderCreateJoin(pre); return; }
+  }catch(e){ console.warn("Invite parse failed", e); }
+
+  openFromNotificationUrl(location.href);
+
+  if(!currentSession()){
+    renderAuth();
+  } else {
+    const s = currentSession(); let u = getUserById(s.userId);
+    connectRealtime();
+    syncFromServer();
+    enablePush();
+    if(!u){ renderAuth(); } else { renderDisclaimer(()=>{ startTracking(); }); }
+  }
+}
+
+window.f360 = window.f360 || {};
+window.f360.updateInboxBadge = updateInboxBadge;
+window.f360.sync = syncFromServer;
+window.f360.notice = notice;
+window.f360.ask = ask;
+window.f360.askText = askText;
+window.f360.showLegalGate = showLegalGate;
+window.f360.openFeed = openFeedPanel;
+
+document.addEventListener("DOMContentLoaded", () => {
+  if(document.getElementById("splash-overlay")){
+    showSplashThenBoot();
+  } else {
+    showLegalGate().then(() => boot()).catch(e => console.error(e));
+  }
+});
+

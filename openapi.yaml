@@ -1,0 +1,128 @@
+openapi: 3.0.3
+info:
+  title: GPS FAMILIA API
+  version: 2.11.0
+  description: Family location, encrypted messaging, friends, marketplace, wallet, feed, rooms, and WebRTC calling.
+  license:
+    name: ISC
+    url: https://opensource.org/licenses/ISC
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+paths:
+  /api/health:
+    get:
+      security: []
+      summary: Liveness
+      responses:
+        "200":
+          description: OK
+  /api/config:
+    get:
+      security: []
+      summary: Public client config (no private keys)
+      responses:
+        "200":
+          description: OK
+  /api/i18n:
+    get:
+      security: []
+      summary: UI strings for a language
+      parameters:
+        - in: query
+          name: lang
+          schema: { type: string, enum: [en, es] }
+      responses:
+        "200":
+          description: Catalog
+  /api/login:
+    post:
+      security: []
+      summary: Password login
+      responses:
+        "200": { description: Session }
+        "401": { description: Bad credentials }
+        "429": { description: Rate limited }
+  /api/register:
+    post:
+      security: []
+      summary: Create account
+      responses:
+        "200": { description: Session }
+        "400": { description: Validation }
+  /api/sync:
+    get:
+      summary: Family-scoped snapshot
+      responses:
+        "200": { description: Users, families, messages }
+        "401": { description: Unauthorized }
+  /api/location:
+    post:
+      summary: Publish GPS
+      responses:
+        "200": { description: Broadcast to family }
+  /api/messages:
+    post:
+      summary: Encrypted or SOS message
+      responses:
+        "200": { description: Stored + WS fan-out }
+  /api/calls:
+    post:
+      summary: Start voice or video call
+      responses:
+        "200": { description: ringing }
+  /api/friends:
+    get:
+      summary: Friends and pending requests
+      responses:
+        "200": { description: friends, incoming, outgoing }
+  /api/friends/request:
+    post:
+      summary: Send a friend request
+      responses:
+        "200": { description: requested or already friends }
+        "403": { description: blocked or not accepting }
+  /api/blocks:
+    get:
+      summary: People you blocked
+      responses:
+        "200": { description: blocks }
+    post:
+      summary: Block a user (stops DMs)
+      responses:
+        "200": { description: blocked }
+  /api/reports:
+    post:
+      summary: Report a user or listing
+      responses:
+        "200": { description: stored }
+  /api/families/{id}/briefing:
+    get:
+      summary: Role, privileges, and what the family can see
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: briefing }
+  /api/market:
+    get:
+      summary: Marketplace listings
+      responses:
+        "200": { description: listings }
+    post:
+      summary: Create a listing
+      responses:
+        "200": { description: listing }
+  /api/pay/wallet:
+    get:
+      summary: Saved cards (last4) and banks — never full PAN
+      responses:
+        "200": { description: wallet }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

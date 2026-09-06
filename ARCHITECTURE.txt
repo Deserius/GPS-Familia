@@ -1,0 +1,44 @@
+GPS FAMILIA — architecture (v2.11.0)
+====================================
+Goal: add features without rewriting the working app. Keep app.js / server.js /
+rooms-server.js intact; new work goes in focused modules.
+
+LAYERS
+  Browser
+    index.html     shell, splash, topbar, dock, map pane
+    app.js         boot, map, auth, inbox glue, drawers (do not truncate)
+    ui-*.js        feature panels (feed, market, call, community)
+    i18n.js        strings
+    sw.js          PWA cache + push
+  Node
+    server.js      HTTP + WebSocket + persist (do not truncate)
+    lib/log.js     JSON logs + request ids
+    lib/gzip.js    gzip JSON responses
+    *-server.js    friends, market, pay, rooms, calls, community, push, security
+
+HOW TO ADD A FEATURE
+  1. New API: create feature-server.js with attach({ app, DB, auth, ... }).
+  2. Require + attach from server.js (one block, like social/market/pay).
+  3. New UI: ui-feature.js ESM export. Import from app.js or dynamic import()
+     when the user opens that panel.
+  4. Tests: tests/suites/NN-feature.js and add to tests/run-all.js.
+  5. Help tab in renderHelp. Docs in DEVELOPER.txt. Bump VERSION + sw cache.
+
+PERFORMANCE RULES
+  - Do not load Google / LiveKit / QR until the user needs them.
+  - Persist is debounced (400ms); memory DB is always current for APIs.
+  - Static images/avatars cache 7 days; HTML/app.js no-cache.
+  - Pause marker/sync timers when the tab is hidden.
+  - Marketplace filters run on the server; do not download the whole catalog.
+
+TROUBLESHOOTING
+  GET /api/health     liveness + version + uptime + rssMb
+  GET /api/diag       counts (demo / DEBUG_API=1 only; no secrets)
+  X-Request-Id        on every /api response; matches JSON logs
+  ?debug=1            tiny HUD (version, hidden, online)
+  npm test            full suite    npm run test:sast
+  OTP_ECHO            local codes print in the server log
+
+NAVIGATION
+  Phone: bottom dock — Map, Inbox, Feed, Market, Menu.
+  Top bar keeps ☰, Track, SOS. Desktop keeps the full top bar.

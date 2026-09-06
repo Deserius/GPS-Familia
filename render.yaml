@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: gps-familia
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: OTP_ECHO
+        value: "false"
+      - key: DEMO_MODE
+        value: "true"

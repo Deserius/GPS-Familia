@@ -1,0 +1,35 @@
+{
+  "name": "gps-familia",
+  "version": "2.11.0",
+  "description": "GPS-FAMILIA — family location sharing, encrypted messaging, and WebRTC calling",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "setup": "npm install",
+    "test": "node tests/run-all.js",
+    "test:security": "node tests/run-all.js --only security",
+    "test:realtime": "node tests/run-all.js --only realtime,calls",
+    "test:auth": "node tests/run-all.js --only auth",
+    "test:sast": "node tests/sast.test.js",
+    "test:ci": "node tests/run-all.js && node tests/sast.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "family",
+    "gps",
+    "location",
+    "chat"
+  ],
+  "author": "GPS-FAMILIA",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "nodemailer": "^9.1.1",
+    "web-push": "^3.6.7",
+    "ws": "^8.18.3"
+  }
+}

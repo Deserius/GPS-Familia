@@ -1,0 +1,484 @@
+================================================================================
+GPS-FAMILIA — DEPLOYMENT CHECKLIST & STEP-BY-STEP GUIDE
+================================================================================
+Read this file top to bottom the first time. You do not need to be a developer.
+Every command is copy-paste. Free options are marked FREE.
+
+What this app is
+----------------
+A family location + encrypted chat web app. The Node.js server (server.js)
+serves the website, the API, and a live WebSocket. Users open it in a browser
+(or as an installed app / APK wrapper). Locations of other people are NEVER
+shown unless they share a family with you.
+
+
+================================================================================
+A. QUICK LOCAL RUN (your computer)
+================================================================================
+You need: Node.js 18+ from https://nodejs.org  (LTS). Optional: Python 3.
+
+Windows
+  1. Double-click Start.bat
+  2. Wait until a browser tab opens at http://127.0.0.1:3000/
+
+macOS / Linux
+  1. Open Terminal in this folder
+  2. python3 start.py
+
+Manual (any OS)
+  npm install
+  copy .env.example to .env     (Windows: copy .env.example .env)
+  node server.js
+
+CHECKLIST — local
+  [ ] Node.js 18+ installed (`node -v`)
+  [ ] `npm install` finished with no errors
+  [ ] `.env` exists (start.py / Start.bat creates it)
+  [ ] Browser opens http://127.0.0.1:3000/
+  [ ] Animated splash, then the full Terms of Use (checkbox + I Agree)
+  [ ] Log in / Register (or tap a sample family member; password demo123)
+  [ ] You can register, create a family, turn Track On, send a message
+  [ ] In-app messages are gold-framed popups — never the browser's ugly alert()
+  [ ] Health check: http://127.0.0.1:3000/api/health  shows {"ok":true,"version":"2.8.0",...}
+  [ ] Persist the uploads/ folder (feed photos and videos). Do not commit user media.
+  [ ] Persist /avatars/ (65 profile icons: people, pets, emblems). Served as static files.
+  [ ] /api/config includes vapidPublic (phone lock-screen alerts are armed)
+  [ ] Login and Create/Join Family panels show compact, normal-sized form boxes
+      (family name + password side by side). Demo login: vito@familia.test / demo123
+  [ ] Chat header shows 📞 voice and 🎥 video. POST /api/calls returns ringing.
+
+v2.8.0 adds voice/video calling (Matrix m.call.* over /ws + LiveKit or P2P WebRTC),
+65 profile icons (People / Pets / Emoji picker), compact login & family-create
+forms, and Help → Calls. v2.7.0 added the icon picker, feed chips, and People hub.
+
+
+================================================================================
+B. CONFIGURATION (.env) — what each line means
+================================================================================
+PORT=3000                 Web port. Hosts like Render set this for you.
+HOST=0.0.0.0              Listen on all interfaces (required on servers).
+
+OTP_ECHO=true             LOCAL ONLY. Puts the 6-digit code in the API so
+                          login works without SMS. Set to false in production
+                          once email or Twilio is configured.
+
+GOOGLE_CLIENT_ID=         Paste your Google OAuth Web Client ID here
+                          (looks like 123456789-xxxx.apps.googleusercontent.com)
+                          In-app Help is for family users only — paste the ID
+                          in .env, not in the Help menu.
+
+VAPID_PUBLIC / VAPID_PRIVATE / VAPID_MAILTO
+                          Lock-screen Web Push keys. Leave blank: the server
+                          creates them on first boot and saves them in
+                          f360_data.json. On a new host, copy the keys into
+                          .env so existing phone subscriptions keep working.
+
+LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET
+                          Optional. When set, voice/video uses a LiveKit SFU
+                          (best for group calls and strict NATs). Leave blank
+                          to use encrypted peer-to-peer WebRTC + public STUN.
+                          See section I2.
+
+TURN_URL / TURN_USER / TURN_PASS
+                          Optional TURN for two phones on carrier data that
+                          cannot connect P2P.
+
+MATRIX_HOMESERVER         Optional external Matrix (Synapse/Dendrite). Not
+                          required — the app already signals m.call.* on /ws.
+
+DEMO_MODE                 Default true. Seeds sample family members and
+                          accepts OTP 000000. Set false in production.
+
+SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / FROM_EMAIL
+                          Optional. Gmail: create an App Password
+                          https://myaccount.google.com/apppasswords
+                          SMTP_HOST=smtp.gmail.com   SMTP_PORT=587
+
+TWILIO_SID / TWILIO_TOKEN / TWILIO_FROM
+                          Optional SMS OTPs. Free trial at https://www.twilio.com
+
+CHECKLIST — production .env
+  [ ] OTP_ECHO=false
+  [ ] GOOGLE_CLIENT_ID set if you want Sign in with Google
+  [ ] SMTP or Twilio set if you want real OTPs (otherwise password + Google)
+  [ ] Never commit .env or f360_data.json to a public git repo
+
+
+================================================================================
+C. EASIEST FREE WAY TO HOST THIS FOR YOUR USERS  (recommended: Render)
+================================================================================
+This app is a Node server with WebSockets. Static hosts (GitHub Pages,
+Netlify, Cloudflare Pages) CANNOT run it by themselves. You need a free
+Node host. Render.com is the simplest as of 2026.
+
+----- Option 1 (EASIEST, FREE): Render Web Service -----
+https://render.com   Free "Web Service" (spins down after idle; first
+load may take ~30–60 seconds. Fine for families.)
+
+1. Create a free GitHub account if you don't have one: https://github.com
+2. Put this project in a GitHub repository:
+     - Install GitHub Desktop (https://desktop.github.com) OR use:
+         git init
+         git add .
+         git commit -m "GPS-FAMILIA"
+     - On github.com click New repository → create → push
+     IMPORTANT: do NOT upload .env or f360_data.json (they are in .gitignore)
+3. Go to https://dashboard.render.com → New → Web Service
+4. Connect the GitHub repo
+5. Settings:
+     Runtime: Node
+     Build command:   npm install
+     Start command:   node server.js
+     Instance:        Free
+6. Environment variables (Add):
+     NODE_VERSION          20
+     HOST                  0.0.0.0
+     OTP_ECHO              false
+     DEMO_MODE             false
+     GOOGLE_CLIENT_ID      (your client id, see section D)
+     SMTP_HOST / USER / PASS / FROM_EMAIL   (optional)
+     LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET   (optional, section I2)
+7. Create Web Service. Render gives you a URL like:
+     https://gps-familia.onrender.com
+8. Open that URL. Register. Send the URL to your family.
+
+Notes
+  • Free Render sleeps after ~15 min idle. First visitor waits for wake-up.
+  • Data is stored in f360_data.json on the server disk. On the FREE plan
+    that disk can reset if the instance is replaced. For a family of a few
+    people this is usually OK. For something more durable, later add a
+    paid disk or switch to a $5 VPS (see Option 3).
+  • HTTPS is automatic on Render. Phones REQUIRE https for GPS and Google.
+
+----- Option 2 (FREE): Fly.io -----
+https://fly.io
+  1. Install flyctl: https://fly.io/docs/hands-on/install-flyctl/
+  2. fly auth signup
+  3. In this folder: fly launch
+  4. Accept the Node app defaults, do NOT add a Postgres database
+  5. fly secrets set OTP_ECHO=false GOOGLE_CLIENT_ID=your-id
+  6. fly deploy
+  You get https://something.fly.dev
+
+----- Option 3 (FREE forever VPS): Oracle Cloud Always Free -----
+A real Linux server, never sleeps. Harder first hour, then rock solid.
+  1. https://www.oracle.com/cloud/free/  → Always Free ARM VM
+  2. Create an Ubuntu instance, open ports 80 and 443 in the VNIC firewall
+  3. SSH in, install Node 20:
+       curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+       sudo apt-get install -y nodejs nginx
+  4. Upload this folder (scp / Git)
+  5. npm install && node server.js   (use pm2 to keep it alive:
+       sudo npm i -g pm2
+       pm2 start server.js --name familia
+       pm2 startup && pm2 save)
+  6. Point a free domain (https://www.freenom.com is gone; use
+     https://www.duckdns.org or Cloudflare) at the VM
+  7. HTTPS with Caddy or Certbot (Let's Encrypt, free)
+
+----- Option 4 (almost free): Railway / Koyeb -----
+Same idea as Render. Watch the free-credit limits.
+
+NOT suitable by themselves
+  GitHub Pages, Netlify, Cloudflare Pages, itch.io — they only serve
+  static files. This app needs Node + WebSocket.
+
+
+================================================================================
+D. GOOGLE SIGN-IN  (free — takes about 5 minutes)
+================================================================================
+Google login is REAL. It talks to Google's servers. You must create a
+free OAuth Client ID. There is no password stored for Google users.
+
+1. Open https://console.cloud.google.com/
+2. Sign in with any Google account → Create a new project (name: GPS-FAMILIA)
+3. APIs & Services → OAuth consent screen
+     User type: External  →  Create
+     App name: GPS-FAMILIA
+     User support email: your Gmail
+     Developer contact: your Gmail
+     Save and continue through Scopes (default is fine)
+     Test users: add the Gmail addresses of your family while the app is
+     in "Testing". You can later click Publish app (still free).
+4. APIs & Services → Credentials → Create credentials → OAuth client ID
+     Application type: Web application
+     Name: GPS-FAMILIA web
+     Authorized JavaScript origins — ADD BOTH:
+         http://localhost:3000
+         http://127.0.0.1:3000
+         https://YOUR-RENDER-URL.onrender.com     (no trailing slash)
+     Authorized redirect URIs — same origins are enough for this app
+     (GIS id_token flow does not need a redirect URI, but adding the
+     origin URL does not hurt)
+5. Copy the Client ID (….apps.googleusercontent.com)
+6. Put it in .env as GOOGLE_CLIENT_ID=..... and restart the server
+7. Log out → you should see "Continue with Google"
+
+CHECKLIST — Google
+  [ ] OAuth consent screen created
+  [ ] Web client ID created
+  [ ] JavaScript origin includes your exact https URL (and localhost for dev)
+  [ ] Client ID saved in .env (GOOGLE_CLIENT_ID)
+  [ ] Test: a Google account can sign in and lands on the map
+  [ ] If the button is blank: origin mismatch. Add the exact URL Google shows
+      in the error (scheme + host + port, no path)
+
+
+================================================================================
+E. PRODUCTION HARDENING CHECKLIST
+================================================================================
+  [ ] OTP_ECHO=false
+  [ ] HTTPS (automatic on Render / Fly)
+  [ ] Google origins match the live URL
+  [ ] You registered a test account and created a family
+  [ ] A second device/browser can join with the invite QR / link
+  [ ] Location of user B is visible to user A ONLY after they share a family
+  [ ] Search by phone does NOT reveal a stranger's map pin
+  [ ] Messages show as bubbles (yours right / theirs left) and stay after refresh
+  [ ] Track Off stops sharing
+  [ ] f360_data.json is not publicly downloadable
+      (visit https://yoursite/f360_data.json — must be 404)
+  [ ] Optional: SMTP so OTPs go to email
+  [ ] Phone alerts: after login the app asks to Allow lock-screen
+      notifications; tap Allow, then send a test message from another account
+  [ ] Track On, leave the app, confirm history still records until Track Off
+  [ ] First launch shows Terms of Use; Help → Terms shows the same text
+  [ ] ☰ → Profile icon opens the 65-icon picker (People / Pets / Emoji / Upload)
+  [ ] Create / Join Family: name + password are normal-sized side-by-side boxes
+  [ ] Two demo logins (or two browsers): Vito calls Sonny — 📞 / 🎥 in chat
+  [ ] npm test  (or: node tests/run-all.js --base https://YOUR_HOST --no-start)
+      → tests/reports/latest.md is GREEN (0 FAIL). WARNs about demoPassword
+      are expected until DEMO_MODE=false.
+  [ ] Tell users: this is for CONSENTING family only
+
+
+================================================================================
+F. TURN THIS INTO AN ANDROID APK  (easiest FREE methods)
+================================================================================
+The app is already a PWA (Progressive Web App). That is the key.
+
+----- Method 1 (EASIEST, FREE): PWABuilder -----
+https://www.pwabuilder.com
+
+1. Deploy the web app with HTTPS (section C). PWABuilder cannot wrap localhost.
+2. Open https://www.pwabuilder.com
+3. Paste your live URL  → Start
+4. Wait for the score. Package for Android.
+5. Options:
+     Package ID:  com.yourname.gpsfamilia
+     App name:    GPS-FAMILIA
+     Host:        your domain
+     Display:     standalone
+6. Download the zip. Inside you get:
+     - an .apk  you can sideload (enable "Install unknown apps")
+     - an .aab  for Google Play
+7. To install on a phone without Play:
+     send the .apk to the phone → open it → Install
+
+This uses Trusted Web Activity: it is your real website inside a tiny
+Android wrapper. Updates to the website update the "app" automatically.
+
+----- Method 2 (FREE): Bubblewrap / TWA command line -----
+https://github.com/GoogleChromeLabs/bubblewrap
+  npm i -g @bubblewrap/cli
+  bubblewrap init --manifest https://YOUR-SITE/manifest.json
+  bubblewrap build
+Needs Android Studio / JDK. More control, same result as PWABuilder.
+
+----- Method 3: Capacitor (if you later want native plugins) -----
+https://capacitorjs.com   (open source, free)
+  npm i -g @ionic/cli
+  npm i @capacitor/core @capacitor/cli @capacitor/android
+  npx cap init "GPS-FAMILIA" com.yourname.gpsfamilia --web-dir .
+  npx cap add android
+  npx cap copy && npx cap open android
+Then build an APK in Android Studio (Build → Build Bundle(s) / APK(s)).
+You would still point Capacitor at your hosted HTTPS server for the API
+(set server.url in capacitor.config.json) because GPS + chat need the backend.
+
+CHECKLIST — Android
+  [ ] Site is on HTTPS
+  [ ] /manifest.json loads
+  [ ] /icon-192.png and /icon-512.png load
+  [ ] PWABuilder packages without errors
+  [ ] APK installs and Sign in with Google works (add the package's
+      digital asset links if Play requires it; PWABuilder documents this)
+
+
+================================================================================
+G. iOS — easiest paths (Apple does not allow sideloading like Android)
+================================================================================
+Apple does not let you email an .ipa to family the way Android does with
+an .apk, unless you pay $99/year for an Apple Developer account.
+
+----- Method 1 (EASIEST, FREE): Add to Home Screen -----
+This is how most family apps ship on iPhone without an App Store listing.
+
+1. Deploy the site on HTTPS (section C)
+2. On iPhone / iPad, open Safari (not Chrome)
+3. Visit your URL
+4. Tap the Share button (square with arrow)
+5. Tap "Add to Home Screen"
+6. Name it GPS-FAMILIA → Add
+
+It opens full-screen like a native app. Push GPS, chat, Google login all
+work (Safari). Tell your family these 4 steps once.
+
+----- Method 2: Capacitor → Xcode → TestFlight / App Store -----
+Needs: a Mac, Xcode (free on the Mac App Store), and an Apple Developer
+Program membership ($99/year) to install on other people's phones.
+
+  npm i @capacitor/ios
+  npx cap add ios
+  npx cap copy ios
+  npx cap open ios
+
+In Xcode: pick your Team, set a Bundle ID, Product → Archive, upload to
+App Store Connect / TestFlight. TestFlight is the easy way to invite
+family testers.
+
+----- Method 3: PWABuilder iOS package -----
+PWABuilder can also spit out an Xcode project. Same $99/year rule to
+distribute. For a family of relatives, Method 1 is the rational choice.
+
+CHECKLIST — iOS
+  [ ] HTTPS site
+  [ ] apple-touch-icon present (icon-192.png)
+  [ ] Tested "Add to Home Screen" on a real iPhone
+  [ ] Geolocation permission prompt appears and tracking works
+  [ ] If using Google login, the iOS origin (https://your.site) is in
+      Google Authorized JavaScript origins
+
+
+================================================================================
+H. UPDATING AFTER YOU ARE LIVE
+================================================================================
+1. Change code on your computer
+2. git add -A && git commit -m "update" && git push
+3. Render/Fly auto-deploys from GitHub
+4. Users just refresh (or reopen the PWA). No new APK required if you
+   used PWABuilder TWA / Add to Home Screen.
+
+If you used a VPS: git pull && pm2 restart familia
+
+
+================================================================================
+I. TROUBLESHOOTING
+================================================================================
+Blank map
+  Leaflet/OSM needs internet. Corporate Wi-Fi may block tile servers.
+
+Google button missing / "origin not allowed"
+  Add the EXACT URL (https://gps-familia.onrender.com) to Authorized
+  JavaScript origins. Wait 1–2 minutes. Hard-refresh.
+
+GPS says denied
+  Browser padlock → Site settings → Location → Allow.
+  iOS: Settings → Safari → Location. Android Chrome: Site settings.
+
+OTP never arrives
+  With OTP_ECHO=true the code is shown in a centered in-app popup and in
+  the server log. In production set SMTP or Twilio, and OTP_ECHO=false.
+
+Lock-screen notifications never appear
+  Requires HTTPS (or localhost), a service worker, and Allow on the
+  browser prompt. Check /api/config → vapidPublic is a long string.
+  iPhone: Add to Home Screen first, then open from the icon and Allow.
+  Android Chrome: Site settings → Notifications → Allow.
+
+WebSocket / "live" never appears
+  Proxies must allow Upgrade headers. Render and Fly do. nginx needs:
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+Data vanished on Render free
+  The free instance was replaced. Export is: download f360_data.json
+  from the host (SSH / disk) and keep a backup. Or move to a VPS.
+
+Port already in use locally
+  Change PORT in .env, or close the other node process.
+
+
+================================================================================
+I2. VOICE / VIDEO CALLS (Matrix signaling + LiveKit or P2P)
+================================================================================
+Calls work out of the box with no extra accounts:
+
+  1. Open a chat (direct, family, or group).
+  2. Tap 📞 voice or 🎥 video.
+  3. The other person Accepts. Both browsers must allow camera/mic.
+
+How it is wired
+  Signaling uses Matrix call events (m.call.invite / answer / candidates /
+  hangup) over the existing WebSocket. Identifiers look like
+  @u_demo_vito:gps-familia.local — GET /api/matrix/whoami.
+
+  Media is WebRTC. Default is peer-to-peer with Google STUN so demo
+  logins work immediately. For group calls or strict NATs, self-host
+  LiveKit (easiest SFU) and set in .env:
+
+    LIVEKIT_URL=wss://your-livekit-host
+    LIVEKIT_API_KEY=devkey
+    LIVEKIT_API_SECRET=secret
+
+  LiveKit self-host (FREE, one box):
+    https://docs.livekit.io/home/self-hosting/local/
+    Docker: docker run --rm -p 7880:7880 -e LIVEKIT_KEYS="devkey: secret" livekit/livekit-server --dev
+
+  Optional TURN (if two phones on carrier data cannot connect):
+    TURN_URL=turn:turn.example.com:3478
+    TURN_USER=...
+    TURN_PASS=...
+
+  Optional external Matrix homeserver (Synapse / Dendrite) — not required:
+    MATRIX_HOMESERVER=https://matrix.example.com
+
+Need HTTPS (or localhost) for getUserMedia. The hosted preview is HTTPS.
+
+
+================================================================================
+J. LEGAL / SAFETY (short)
+================================================================================
+This software is for CONSENTING families. Do not use it to track anyone
+who has not agreed. Location sharing is off until the user accepts the
+disclaimer and taps Track On. Other users' pins never appear unless they
+are in one of your families.
+
+================================================================================
+End of DEPLOY.txt
+================================================================================
+
+
+================================================================================
+Z. DOCKER (optional production box)
+================================================================================
+  1. Copy .env.example to .env and fill GOOGLE_CLIENT_ID, SMTP, etc.
+  2. Set DEMO_MODE=false  OTP_ECHO=false  NODE_ENV=production
+  3. CORS_ORIGIN=https://your-public-host
+  4. docker compose up --build -d
+  5. Data persists in the familia-data volume (/data/f360_data.json).
+  6. Health: curl http://127.0.0.1:3000/api/health
+
+CI: GitHub Actions runs npm test and tests/sast.test.js on push.
+
+
+================================================================================
+Y. STRIPE + PLAID (optional live payments)
+================================================================================
+Cards and banks work in demo without keys (last4 only). For live money:
+
+Stripe
+  1. https://dashboard.stripe.com/apikeys
+  2. STRIPE_PUBLISHABLE_KEY=pk_test_...
+  3. STRIPE_SECRET_KEY=sk_test_...
+  4. Never commit live sk_ keys. Restart the server.
+
+Plaid
+  1. https://dashboard.plaid.com/developers/keys
+  2. PLAID_CLIENT_ID=...
+  3. PLAID_SECRET=...
+  4. PLAID_ENV=sandbox   (or development / production)
+
+The app rejects any request that includes a full card number, CVC, or
+routing/account number. Clients send Stripe PaymentMethod ids or last4.

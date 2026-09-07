@@ -1,0 +1,440 @@
+{
+  "version": 3,
+  "avatars": [
+    {
+      "id": "av-01",
+      "file": "/avatars/av-01.png",
+      "label": "Nia",
+      "cat": "people"
+    },
+    {
+      "id": "av-02",
+      "file": "/avatars/av-02.png",
+      "label": "Don Silver",
+      "cat": "people"
+    },
+    {
+      "id": "av-03",
+      "file": "/avatars/av-03.png",
+      "label": "Kenji",
+      "cat": "people"
+    },
+    {
+      "id": "av-04",
+      "file": "/avatars/av-04.png",
+      "label": "Camila",
+      "cat": "people"
+    },
+    {
+      "id": "av-05",
+      "file": "/avatars/av-05.png",
+      "label": "Elise",
+      "cat": "people"
+    },
+    {
+      "id": "av-06",
+      "file": "/avatars/av-06.png",
+      "label": "Amir",
+      "cat": "people"
+    },
+    {
+      "id": "av-07",
+      "file": "/avatars/av-07.png",
+      "label": "Priya",
+      "cat": "people"
+    },
+    {
+      "id": "av-08",
+      "file": "/avatars/av-08.png",
+      "label": "Earl",
+      "cat": "people"
+    },
+    {
+      "id": "av-09",
+      "file": "/avatars/av-09.png",
+      "label": "Mateo",
+      "cat": "people"
+    },
+    {
+      "id": "av-10",
+      "file": "/avatars/av-10.png",
+      "label": "Saoirse",
+      "cat": "people"
+    },
+    {
+      "id": "av-11",
+      "file": "/avatars/av-11.png",
+      "label": "Mei",
+      "cat": "people"
+    },
+    {
+      "id": "av-12",
+      "file": "/avatars/av-12.png",
+      "label": "Marcus",
+      "cat": "people"
+    },
+    {
+      "id": "av-13",
+      "file": "/avatars/av-13.png",
+      "label": "Ananya",
+      "cat": "people"
+    },
+    {
+      "id": "av-14",
+      "file": "/avatars/av-14.png",
+      "label": "Rafael",
+      "cat": "people"
+    },
+    {
+      "id": "pet-dog",
+      "file": "/avatars/pet-dog.png",
+      "label": "Golden",
+      "cat": "pets"
+    },
+    {
+      "id": "pet-cat",
+      "file": "/avatars/pet-cat.png",
+      "label": "Tabby",
+      "cat": "pets"
+    },
+    {
+      "id": "pet-fox",
+      "file": "/avatars/pet-fox.png",
+      "label": "Fox",
+      "cat": "pets"
+    },
+    {
+      "id": "sym-crown",
+      "file": "/avatars/sym-crown.png",
+      "label": "Crown 3D",
+      "cat": "symbols"
+    },
+    {
+      "id": "sym-lion",
+      "file": "/avatars/sym-lion.png",
+      "label": "Lion 3D",
+      "cat": "symbols"
+    },
+    {
+      "id": "sym-rose",
+      "file": "/avatars/sym-rose.png",
+      "label": "Rose 3D",
+      "cat": "symbols"
+    },
+    {
+      "id": "ic-pills",
+      "file": "/avatars/ic-pills.svg",
+      "label": "Pills",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc8a"
+    },
+    {
+      "id": "ic-gas",
+      "file": "/avatars/ic-gas.svg",
+      "label": "Gas",
+      "cat": "symbols",
+      "emoji": "\u26fd"
+    },
+    {
+      "id": "ic-heels",
+      "file": "/avatars/ic-heels.svg",
+      "label": "High heels",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc60"
+    },
+    {
+      "id": "ic-moneybag",
+      "file": "/avatars/ic-moneybag.svg",
+      "label": "Moneybags",
+      "cat": "symbols",
+      "emoji": "\ud83d\udcb0"
+    },
+    {
+      "id": "ic-dollar",
+      "file": "/avatars/ic-dollar.svg",
+      "label": "Golden dollar",
+      "cat": "symbols",
+      "emoji": "\ud83e\ude99"
+    },
+    {
+      "id": "ic-snowflake",
+      "file": "/avatars/ic-snowflake.svg",
+      "label": "Snowflake",
+      "cat": "symbols",
+      "emoji": "\u2744\ufe0f"
+    },
+    {
+      "id": "ic-rain",
+      "file": "/avatars/ic-rain.svg",
+      "label": "Rain drop",
+      "cat": "symbols",
+      "emoji": "\ud83d\udca7"
+    },
+    {
+      "id": "ic-lips",
+      "file": "/avatars/ic-lips.svg",
+      "label": "Lips",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc8b"
+    },
+    {
+      "id": "ic-ears",
+      "file": "/avatars/ic-ears.svg",
+      "label": "Ears",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc42"
+    },
+    {
+      "id": "ic-police",
+      "file": "/avatars/ic-police.svg",
+      "label": "Police",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc6e"
+    },
+    {
+      "id": "ic-no",
+      "file": "/avatars/ic-no.svg",
+      "label": "No",
+      "cat": "symbols",
+      "emoji": "\ud83d\udeab"
+    },
+    {
+      "id": "ic-dog",
+      "file": "/avatars/ic-dog.svg",
+      "label": "Dog",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc36"
+    },
+    {
+      "id": "ic-cat",
+      "file": "/avatars/ic-cat.svg",
+      "label": "Cat",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc31"
+    },
+    {
+      "id": "ic-squirrel",
+      "file": "/avatars/ic-squirrel.svg",
+      "label": "Squirrel",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc3f\ufe0f"
+    },
+    {
+      "id": "ic-medical",
+      "file": "/avatars/ic-medical.svg",
+      "label": "Medical",
+      "cat": "symbols",
+      "emoji": "\u2695\ufe0f"
+    },
+    {
+      "id": "ic-bird",
+      "file": "/avatars/ic-bird.svg",
+      "label": "Bird",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc26"
+    },
+    {
+      "id": "ic-bee",
+      "file": "/avatars/ic-bee.svg",
+      "label": "Bee",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc1d"
+    },
+    {
+      "id": "ic-crown",
+      "file": "/avatars/ic-crown.svg",
+      "label": "Crown",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc51"
+    },
+    {
+      "id": "ic-rose",
+      "file": "/avatars/ic-rose.svg",
+      "label": "Rose",
+      "cat": "symbols",
+      "emoji": "\ud83c\udf39"
+    },
+    {
+      "id": "ic-dice",
+      "file": "/avatars/ic-dice.svg",
+      "label": "Dice",
+      "cat": "symbols",
+      "emoji": "\ud83c\udfb2"
+    },
+    {
+      "id": "ic-lion",
+      "file": "/avatars/ic-lion.svg",
+      "label": "Lion",
+      "cat": "symbols",
+      "emoji": "\ud83e\udd81"
+    },
+    {
+      "id": "ic-compass",
+      "file": "/avatars/ic-compass.svg",
+      "label": "Compass",
+      "cat": "symbols",
+      "emoji": "\ud83e\udded"
+    },
+    {
+      "id": "ic-fire",
+      "file": "/avatars/ic-fire.svg",
+      "label": "Fire",
+      "cat": "symbols",
+      "emoji": "\ud83d\udd25"
+    },
+    {
+      "id": "ic-moon",
+      "file": "/avatars/ic-moon.svg",
+      "label": "Moon",
+      "cat": "symbols",
+      "emoji": "\ud83c\udf19"
+    },
+    {
+      "id": "ic-star",
+      "file": "/avatars/ic-star.svg",
+      "label": "Star",
+      "cat": "symbols",
+      "emoji": "\u2b50"
+    },
+    {
+      "id": "ic-heart",
+      "file": "/avatars/ic-heart.svg",
+      "label": "Heart",
+      "cat": "symbols",
+      "emoji": "\u2764\ufe0f"
+    },
+    {
+      "id": "ic-wolf",
+      "file": "/avatars/ic-wolf.svg",
+      "label": "Wolf",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc3a"
+    },
+    {
+      "id": "ic-coffee",
+      "file": "/avatars/ic-coffee.svg",
+      "label": "Coffee",
+      "cat": "symbols",
+      "emoji": "\u2615"
+    },
+    {
+      "id": "ic-diamond",
+      "file": "/avatars/ic-diamond.svg",
+      "label": "Diamond",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc8e"
+    },
+    {
+      "id": "ic-key",
+      "file": "/avatars/ic-key.svg",
+      "label": "Key",
+      "cat": "symbols",
+      "emoji": "\ud83d\udd11"
+    },
+    {
+      "id": "ic-lock",
+      "file": "/avatars/ic-lock.svg",
+      "label": "Lock",
+      "cat": "symbols",
+      "emoji": "\ud83d\udd12"
+    },
+    {
+      "id": "ic-anchor",
+      "file": "/avatars/ic-anchor.svg",
+      "label": "Anchor",
+      "cat": "symbols",
+      "emoji": "\u2693"
+    },
+    {
+      "id": "ic-butterfly",
+      "file": "/avatars/ic-butterfly.svg",
+      "label": "Butterfly",
+      "cat": "symbols",
+      "emoji": "\ud83e\udd8b"
+    },
+    {
+      "id": "ic-chess",
+      "file": "/avatars/ic-chess.svg",
+      "label": "Chess",
+      "cat": "symbols",
+      "emoji": "\u265f\ufe0f"
+    },
+    {
+      "id": "ic-horseshoe",
+      "file": "/avatars/ic-horseshoe.svg",
+      "label": "Horseshoe",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc34"
+    },
+    {
+      "id": "ic-wine",
+      "file": "/avatars/ic-wine.svg",
+      "label": "Wine",
+      "cat": "symbols",
+      "emoji": "\ud83c\udf77"
+    },
+    {
+      "id": "ic-moto",
+      "file": "/avatars/ic-moto.svg",
+      "label": "Motorcycle",
+      "cat": "symbols",
+      "emoji": "\ud83c\udfcd\ufe0f"
+    },
+    {
+      "id": "ic-ring",
+      "file": "/avatars/ic-ring.svg",
+      "label": "Ring",
+      "cat": "symbols",
+      "emoji": "\ud83d\udc8d"
+    },
+    {
+      "id": "ic-eagle",
+      "file": "/avatars/ic-eagle.svg",
+      "label": "Eagle",
+      "cat": "symbols",
+      "emoji": "\ud83e\udd85"
+    },
+    {
+      "id": "ic-fox",
+      "file": "/avatars/ic-fox.svg",
+      "label": "Fox",
+      "cat": "symbols",
+      "emoji": "\ud83e\udd8a"
+    },
+    {
+      "id": "ic-owl",
+      "file": "/avatars/ic-owl.svg",
+      "label": "Owl",
+      "cat": "symbols",
+      "emoji": "\ud83e\udd89"
+    },
+    {
+      "id": "ic-spade",
+      "file": "/avatars/ic-spade.svg",
+      "label": "Spade",
+      "cat": "symbols",
+      "emoji": "\u2660\ufe0f"
+    },
+    {
+      "id": "ic-clover",
+      "file": "/avatars/ic-clover.svg",
+      "label": "Clover",
+      "cat": "symbols",
+      "emoji": "\ud83c\udf40"
+    },
+    {
+      "id": "ic-bolt",
+      "file": "/avatars/ic-bolt.svg",
+      "label": "Lightning",
+      "cat": "symbols",
+      "emoji": "\u26a1"
+    },
+    {
+      "id": "ic-cigar",
+      "file": "/avatars/ic-cigar.svg",
+      "label": "Cigar",
+      "cat": "symbols",
+      "emoji": "\ud83d\udeac"
+    }
+  ]
+}

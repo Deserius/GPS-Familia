@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+.env
+f360_data.json
+f360_data.json.tmp
+uploads
+.cache
+.git
+tests/reports
+*.md
+!README.md

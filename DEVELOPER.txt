@@ -1,0 +1,344 @@
+See ARCHITECTURE.txt for where to add features, performance rules, and /api/diag.
+
+================================================================================
+GPS-FAMILIA — DEVELOPER.TXT
+Implementation map, configuration, APIs, and step-by-step internals
+Version 2.16.0  ·  2026-09-07
+================================================================================
+In-app Help is for family users only (no hosting/APK jargon). This file is
+the operator/developer companion. Deploy checklists: DEPLOY.txt.
+Do not rewrite rooms-server.js or the messenger inbox unless you are fixing
+a bug — calling was added on top of the existing chat.
+
+
+1. WHAT RUNS
+------------
+  node server.js          Express 5 + ws. Serves static files, REST, /ws.
+  VERSION                 2.16.0 (package.json, server.js health).
+  Data file               f360_data.json (users, families, messages, rooms,
+                          places, VAPID keys, sessions). Created on first boot.
+  Uploads                 /uploads  (feed photos/videos)
+  Avatars                 /avatars  (65 icons + catalog.json)
+  PWA                     sw.js cache gps-familia-v47, manifest.json
+
+  Key modules (do not flatten into one file):
+    server.js             HTTP, auth, GPS, families, WS fan-out, attachCalls
+    rooms-server.js       Hobby rooms REST  — do not rebuild
+    calls-server.js       /api/calls*, /api/matrix/whoami, handleCallWs, LiveKit JWT
+    community-server.js   Feed + people hub + family admin
+    app.js                UI: map, auth, families, inbox, help, avatar picker
+    ui-people.js          Profile, My QR, scan router, notification center
+    notify-server.js      GET/POST /api/notifications* (in-app, plus Web Push)
+    qr-server.js          POST /api/qr/generate|resolve  GET /qr/:token
+    modules/social/graph.js  relationshipOf / canDiscover
+    ui-call.js            startCall / handleCallEvent / bindCalls / P2P+LiveKit
+    ui-feed.js            Community feed panel
+    ui-community.js       Demo logins, social share SVGs, family admin
+    styles.css            Theme + compact .auth-shell / .form-shell / .fam-create
+    tests/                Full-stack security + operability runner (`npm test`)
+
+
+2. LOCAL RUN (step by step)
+---------------------------
+  1. Node 18+ (`node -v`).
+  2. npm install --omit=dev     (if node_modules was wiped, always reinstall)
+  3. cp .env.example .env       (Start.bat / start.py do this)
+  4. node server.js
+  5. Open http://127.0.0.1:3000/
+  6. Splash → Terms checkbox → I Agree → compact login card.
+  7. Demo: vito@familia.test / demo123   or tap a sample member.
+     OTP 000000 when DEMO_MODE is true.
+  8. curl http://127.0.0.1:3000/api/health
+      Expect: {"ok":true,"version":"2.16.0","realtime":true}
+
+  If express MODULE_NOT_FOUND: npm install, then start again.
+  Do not pkill in a way that deletes node_modules (sandbox snapshots
+  exclude node_modules).
+
+
+3. CONFIGURATION (.env) — implementation notes
+----------------------------------------------
+  PORT / HOST             Listen. Render/Fly set PORT. HOST=0.0.0.0 on servers.
+  OTP_ECHO=true           Local: OTP is returned in the API + printed in logs.
+  DEMO_MODE=true          Seeds Vito/Sonny/… and accepts OTP 000000 / 123456.
+  GOOGLE_CLIENT_ID        GIS id_token. Origins must match exactly.
+  SMTP_* / TWILIO_*       Real OTPs. Leave blank in demo.
+  VAPID_*                 Auto-generated into f360_data.json if blank.
+  LIVEKIT_URL             wss://…  When set, calls-server.js mints HMAC JWTs.
+  LIVEKIT_API_KEY/SECRET  Same as LiveKit server. No livekit-server-sdk dep —
+                          HMAC is implemented in calls-server.js on purpose.
+  TURN_URL/USER/PASS      Added to GET /api/calls/ice alongside Google STUN.
+  MATRIX_HOMESERVER       Optional. Default Matrix ids are
+                          @u_<id>:gps-familia.local via GET /api/matrix/whoami.
+
+  After changing .env, restart node. Client reads live values from GET /api/config
+  (applyServerConfig → window.__serverConfig).
+
+
+4. AUTH FLOW
+------------
+  POST /api/register      { name, email, phone, password }
+  POST /api/login         { identifier, password }  → { user, sessionToken }
+  POST /api/auth/google   { credential } GIS JWT
+  POST /api/send-otp  /  POST /api/verify-otp
+  POST /api/demo/login    { id }  (DEMO_MODE)
+  Authorization: Bearer <sessionToken> on all other routes.
+  WS:  ws://host/ws?token=<sessionToken>
+
+  Compact login UI: .modal.auth-shell (360px). Fields are 30px high.
+  Create/Join Family: .modal.form-shell + .fam-create
+    Family name | Password   (two 30px boxes)
+    Privacy select | Create
+    or join with invite token | Join
+
+
+5. FAMILIES, LOCATION, MESSAGES
+-------------------------------
+  POST /api/families              create { name, password, privacy }
+  POST /api/families/:id/invite   mint { token, url, qrUrl }  (token includes from)
+  GET  /api/invite/preview        ?token=  auth required. Members, roles, rules,
+                                  invitedBy, alreadyMember. Does NOT join.
+  POST /api/families/join         { token } — kept for tests; Accept in the UI
+                                  calls this after the preview.
+  GET  /invite/:token             302 → /?invite=TOKEN  (opens the PWA)
+  Deep link: unsigned users Register/Log in first. After auth, preview then
+  Accept/Decline. Already-members see the briefing only.
+  POST /api/families/:id/join     password / public / request
+  GET  /api/sync                  users + families + rooms + messages + places
+  POST /api/location              { lat, lng, type, record }
+  GET  /api/locations             family pins only
+  POST /api/messages              { to | familyId | roomId, enc }
+  DELETE /api/messages/:id
+  WS type=location | message | sos | family | typing | presence | room | call | feed
+
+  Encryption: AES-GCM on the device (app.js deriveConvKey). SOS is plaintext
+  by design so every family phone can read an emergency.
+
+
+6. CALLING (do not rebuild inbox)
+---------------------------------
+  REST
+    POST /api/calls          { toUserId | familyId | roomId, kind: "voice"|"video" }
+    GET  /api/calls/:id
+    POST /api/calls/:id/hangup
+    GET  /api/calls/ice      STUN (+ TURN if env)
+    GET  /api/matrix/whoami  { mxid: "@u_…:gps-familia.local" }
+
+  WS: msg.type === "call" → callsApi.handleCallWs
+    Events: m.call.invite | answer | candidates | hangup
+    ICE candidates are queued in ui-call.js (_pendingIce / flushIce) until
+    the remote description is set.
+
+  Media: LiveKit if LIVEKIT_URL else RTCPeerConnection + stun.l.google.com
+         / stun1.l.google.com.
+  UI: chatCallBtns on DM / family / room headers. Overlay .call-layer.
+  Deep link: /?call=<id> from a notification.
+  Client: importmap livekit-client@2.15.7 in index.html.
+
+
+7. PROFILE ICONS
+----------------
+  GET /api/avatars           catalog.json (v3, 65 entries)
+  Static /avatars/<id>.png|.svg
+  People av-01…av-14, pets pet-dog|cat|fox, 3D symbols, 45 ic-*.svg
+  Picker: ☰ → photo. Tabs All / People / Pets / Emoji / Upload.
+  Circles 36px, grid 7 across. Adults only.
+
+
+8. COMMUNITY FEED / PEOPLE HUB
+------------------------------
+  community-server.js + ui-feed.js. Right-side #feed-panel.
+  POST /api/feed  (text, audience family|public, media via POST /api/media)
+  People & invites: GET /api/people/hub, POST /api/people/invite, Accept/Decline.
+
+
+9. HELP MENU (user-facing)
+--------------------------
+  renderHelp() in app.js. Tabs: Welcome, Getting started, Profile icon,
+  The map, Families (compact Create/Join explained), Privacy, Messages,
+  Calls, Rooms, Phone alerts, Find people, Tracking, Community, Family
+  roles, Terms, FAQ.
+  Do not put Render/APK/.env instructions in Help — keep them here and
+  in DEPLOY.txt.
+
+
+10. SERVICE WORKER
+------------------
+  CACHE = gps-familia-v47. Bump the string whenever styles.css / app.js /
+  ui-call.js change so phones drop the old shell. SHELL includes /ui-call.js.
+  Push: showNotification with tag + data.url. Calls/SOS use requireInteraction
+  + high urgency; chat TTL 24h. Track-on ping for background GPS.
+  Invites: mintInviteToken is base64url; findInviteFamily matches +/space and
+  pasted https://host/invite/TOKEN or ?invite= URLs. Never mint tokens in the
+  browser — POST /api/families/:id/invite only.
+
+
+11. UI CONTRACT FOR FORMS (2.8.0)
+---------------------------------
+  Login and family-create must stay compact so every field is visible
+  without scrolling on a normal phone / preview pane:
+    .modal.auth-shell / .form-shell  max-width 360px, height auto
+    inputs  height 30px, font 13px  (!important — beats mobile 44px rules)
+    .fam-create-grid  two columns: name | password
+    .fam-create-actions  privacy|Create and token|Join on one row
+  Chat/inbox/help/avatar shells stay larger / full-screen on phones.
+  Do not re-apply .form-row.col { flex: 1 1 140px } — that stretched
+  every label/input to ~140px tall.
+
+
+12. TESTS (copy-paste)
+----------------------
+  npm test
+  # or: node tests/run-all.js --base http://127.0.0.1:3000
+  # Report: tests/reports/latest.md  (FAIL fails the process)
+  # Suites: health, auth, security, families, realtime, community, calls, saas
+  # Plan:   tests/TEST-PLAN.md
+  # Do not add exploit payloads — checks are 401/403, secret stripping, isolation.
+
+  Quick smoke if you cannot run Node tests:
+  curl -s http://127.0.0.1:3000/api/health
+  curl -s http://127.0.0.1:3000/api/avatars | python3 -c "import json,sys; print(json.load(sys.stdin)['count'])"
+  # expect 65
+  # POST /api/login with vito@familia.test / demo123
+  # POST /api/calls  → status ringing, ice servers present
+  # Open ☰ → Create / Join Family — name and password are small side-by-side boxes
+
+
+13. DEPLOY HOOKS
+----------------
+  Build: npm install
+  Start: node server.js
+  Persist: f360_data.json, uploads/, .env (VAPID + LIVEKIT)
+  Reverse proxy must forward WebSocket Upgrade (DEPLOY.txt section I).
+  HTTPS required for GPS, camera/mic, Google, Push.
+
+
+14. FILE TOUCH RULES
+--------------------
+  Do not truncate app.js or server.js.
+  Do not rebuild rooms-server.js / the inbox.
+  Do not add global img,svg{height:auto} — it breaks MapLibre.
+  Profile icons: adults only; store under /avatars/.
+  generate_image max 10 per turn if adding more portraits.
+
+================================================================================
+End of DEVELOPER.txt
+================================================================================
+
+
+12. SAAS HARDENING (v2.8.0)
+---------------------------
+  security.js           CSP / HSTS / frame deny / CORS allow-list / rate limits
+  i18n.js + locales/    English + Español; GET /api/i18n?lang=en|es
+  LICENSE               ISC
+  Dockerfile            node:20-alpine, USER node, DATA_FILE=/data/f360_data.json
+  docker-compose.yml    named volume familia-data
+  .github/workflows/ci.yml   npm test + node tests/sast.test.js
+  openapi.yaml          REST overview
+
+  Auth: Authorization Bearer or X-Session-Token only. REST ?token= is rejected.
+  /api/config never returns demoPassword or private keys.
+  Production defaults (NODE_ENV=production): DEMO_MODE=false, OTP_ECHO=false.
+  CORS_ORIGIN=https://your.host   (comma-separated). localhost always allowed.
+
+  Tests:
+    npm test                 full-stack HTTP + WebSocket
+    npm run test:sast        static secret scan
+    npm run test:ci          both
+
+
+13. FRIENDS, BLOCK, REPORT, MARKET, WALLET (v2.9.0)
+---------------------------------------------------
+  social-server.js      /api/friends* /api/blocks /api/reports /api/safety
+  market-server.js      /api/market*  realtime WS type=market
+  pay-server.js         /api/pay/*    Stripe REST + Plaid REST (no extra npm)
+  ui-market.js          right-side marketplace panel
+
+  Friend request: POST /api/friends/request { userId }
+    Accept/decline: POST /api/friends/:id/accept|decline
+    Unfriend: DELETE /api/friends/:id
+  Block: POST /api/blocks { userId }  DELETE /api/blocks/:userId
+    Blocked pairs cannot DM or friend. Location hidden.
+  Report: POST /api/reports { userId, reason, details, listingId? }
+    reasons: spam, harassment, impersonation, scam, inappropriate,
+             underage, stalking, fake_listing, other
+    Reporter can GET /api/reports/mine (target never sees reports)
+
+  Privacy prefs (PUT /api/me { prefs }):
+    booleans: appearOnMap, preciseLocation, showLastSeen,
+      shareEmailWithFamily, sharePhoneWithFamily, allowHistory, recordHistory,
+      shareEmailWithFriends, sharePhoneWithFriends, shareLocationWithFriends,
+      allowFriendRequests, appearInSearch, showOnlineStatus,
+      allowMarketplaceContact, readReceipts, typingIndicators, hideBlockedInSearch
+    enums: allowMessagesFrom anyone|friends|family|nobody
+           allowCallsFrom anyone|friends|family
+           showProfileTo everyone|friends|family
+
+  Family join returns { family, briefing } with role, privileges, role list,
+  youCan, theyCan. GET /api/families/:id/briefing for members.
+
+  Marketplace: signed-in catalog. Listings store city + fuzzed lat/lng only.
+  Buyer Message opens encrypted /api/messages with the seller.
+  Offers: POST /api/market/:id/offer { amount } — seller accept/decline.
+
+  Wallet: never accepts full PAN, CVC, or routing numbers (400).
+  Stripe: STRIPE_SECRET_KEY + STRIPE_PUBLISHABLE_KEY → SetupIntent + PaymentIntent.
+  Plaid: PLAID_CLIENT_ID + PLAID_SECRET → /link/token/create + exchange.
+  Without keys, demo vault stores last4 + brand + expiry / bank last4.
+
+  Tests: npm test  (suites social + market)
+
+
+14. P2P MARKETPLACE FEE (v2.10.0)
+---------------------------------
+  Buyer pays listed price + 6.9% service fee.
+  Floor $0.49, cap $25. Seller receives 100% of the item price.
+  POST /api/pay/quote { amount } → { item, fee, total, sellerReceives }
+  POST /api/pay/p2p { listingId, amount, methodId }  (saved card, never PAN)
+  Rationale: OfferUp-class 6.9% covers Stripe ~2.9%+$0.30 plus ~3–4% platform
+  margin. Buyer-pays keeps sellers whole (local classifieds trust). Cap protects
+  furniture-priced tickets. Free listings: no fee.
+
+  GET /api/market filters: q, category, condition (new|used|like_new|good|fair|for_parts),
+  minPrice, maxPrice, miles, lat, lng, sort=newest|price_asc|price_desc|distance,
+  status=active|sold|all, filter=mine|saved.
+  Demo listings: lst_demo_* flagged demo:true with photos in /market-demo/.
+
+
+15. PEOPLE GRAPH, QR, NOTIFICATIONS (v2.16.0)
+---------------------------------------------
+  Relationship state is computed on the server (modules/social/graph.js).
+  Frontend only renders `relationship.label` and `relationship.actions`.
+  GET  /api/users/:id/relationship
+  GET  /api/search           q, limit, offset. Channel prefs:
+                             findByName everyone|friends|nobody
+                             findByEmail / findByPhone everyone|nobody
+                             Phone matches strip a leading US +1.
+  POST /api/friends/request  never auto-accepts
+  POST /api/friends/:id/cancel   sender only
+  POST /api/friends/:id/accept   idempotent if already accepted
+  GET  /api/friends/requests
+
+  Message requests (strangers; default allowMessagesFrom=anyone):
+    POST /api/messages { to }  → { requested:true }  (not stored in DB.messages)
+    GET  /api/messages?with=   empty until accept
+    GET  /api/message-requests
+    POST /api/message-requests/:id/accept|decline
+    On accept, pending ciphertext is copied into DB.messages.
+
+  QR (never auto-executes):
+    POST /api/qr/generate { type: profile|friend|family|payment|app, amount?, familyId? }
+    POST /api/qr/resolve  { token } → { kind, confirmRequired, user|family|amount }
+    GET  /qr/:token  → /?qr=  then in-app confirm
+    Family invite tokens still preview via findInviteFamily (Accept required).
+
+  In-app notifications (complements Web Push, does not replace it):
+    GET  /api/notifications  ?filter=all|unread|friend|family|message|payment
+    GET  /api/notifications/summary
+    POST /api/notifications/:id/read
+    POST /api/notifications/read-all
+    WS type=notification | message_request | friend
+
+  UI: ☰ My QR, Scan QR, Notifications. Profile button on people cards.
+  Tests: tests/suites/12-social-graph.js  (journeys A–E)
+

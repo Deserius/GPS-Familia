@@ -78,6 +78,58 @@ function serializeFriend(row, me, getUser, publicUser) {
   };
 }
 
+function createFriendRequest(DB, fromId, toId, helpers) {
+  ensure(DB);
+  const getUser = helpers.getUser;
+  const userPrefs = helpers.userPrefs;
+  const makeId = helpers.makeId;
+  const now = helpers.now;
+  const saveData = helpers.saveData;
+  const sendToUser = helpers.sendToUser;
+  const publicUser = helpers.publicUser;
+  const fromName = helpers.fromName || "Someone";
+  if (!toId) return { status: 400, body: { error: "userId required" } };
+  if (toId === fromId) return { status: 400, body: { error: "cannot friend yourself" } };
+  const target = getUser(toId);
+  if (!target) return { status: 404, body: { error: "user not found" } };
+  if (blockedBetween(DB, fromId, toId)) return { status: 403, body: { error: "you cannot friend this person" } };
+  const prefs = ((typeof userPrefs === "function" ? userPrefs(target) : {}) || {});
+  if (prefs.allowFriendRequests === false) return { status: 403, body: { error: "this person is not accepting friend requests" } };
+  let row = friendship(DB, fromId, toId);
+  if (row && row.status === "accepted") {
+    return { status: 200, body: { ok: true, already: true, kind: "friend", friend: serializeFriend(row, fromId, getUser, publicUser) } };
+  }
+  if (row && row.status === "pending") {
+    if (row.to === fromId) {
+      row.status = "accepted";
+      row.resolvedAt = now();
+      saveData();
+      sendToUser(toId, { type: "friend", action: "accepted", from: fromId });
+      sendToUser(fromId, { type: "friend", action: "accepted", from: toId });
+      return { status: 200, body: { ok: true, accepted: true, kind: "friend", friend: serializeFriend(row, fromId, getUser, publicUser) } };
+    }
+    return { status: 200, body: { ok: true, requested: true, kind: "friend", friend: serializeFriend(row, fromId, getUser, publicUser) } };
+  }
+  row = { id: makeId("fr"), from: fromId, to: toId, status: "pending", createdAt: now() };
+  DB.friends.push(row);
+  saveData();
+  sendToUser(toId, { type: "friend", action: "request", from: fromId, name: fromName, id: row.id });
+  createNotification(DB, saveData, {
+    id: makeId("nt"),
+    recipientId: toId,
+    createdAt: now(),
+    type: "friend",
+    actorId: fromId,
+    entityType: "friend_request",
+    entityId: row.id,
+    title: "Friend request",
+    body: fromName + " sent you a friend request.",
+    url: "/?people=friends"
+  });
+  sendToUser(toId, { type: "notification", action: "friend" });
+  return { status: 200, body: { ok: true, requested: true, kind: "friend", friend: serializeFriend(row, fromId, getUser, publicUser) } };
+}
+
 function attach(ctx) {
   const {
     app, DB, saveData, auth, makeId, now, getUser, publicUser,
@@ -142,42 +194,12 @@ function attach(ctx) {
   });
 
   app.post("/api/friends/request", auth, (req, res) => {
-    ensure(DB);
     const to = String((req.body || {}).userId || (req.body || {}).to || "");
-    if (!to) return res.status(400).json({ error: "userId required" });
-    if (to === req.userId) return res.status(400).json({ error: "cannot friend yourself" });
-    const target = getUser(to);
-    if (!target) return res.status(404).json({ error: "user not found" });
-    if (blockedBetween(DB, req.userId, to)) return res.status(403).json({ error: "you cannot friend this person" });
-    const prefs = userPrefs(target);
-    if (prefs.allowFriendRequests === false) return res.status(403).json({ error: "this person is not accepting friend requests" });
-    let row = friendship(DB, req.userId, to);
-    if (row && row.status === "accepted") return res.json({ ok: true, already: true, friend: serializeFriend(row, req.userId, getUser, publicUser) });
-    if (row && row.status === "pending") {
-      if (row.to === req.userId) {
-        row.status = "accepted";
-        row.resolvedAt = now();
-        saveData();
-        sendToUser(to, { type: "friend", action: "accepted", from: req.userId });
-        sendToUser(req.userId, { type: "friend", action: "accepted", from: to });
-        return res.json({ ok: true, accepted: true, friend: serializeFriend(row, req.userId, getUser, publicUser) });
-      }
-      return res.json({ ok: true, requested: true, friend: serializeFriend(row, req.userId, getUser, publicUser) });
-    }
-    row = { id: makeId("fr"), from: req.userId, to, status: "pending", createdAt: now() };
-    DB.friends.push(row);
-    saveData();
-    sendToUser(to, { type: "friend", action: "request", from: req.userId, name: req.user.name, id: row.id });
-    ping(to, {
-      type: "friend",
-      actorId: req.userId,
-      entityType: "friend_request",
-      entityId: row.id,
-      title: "Friend request",
-      body: (req.user.name || "Someone") + " sent you a friend request.",
-      url: "/?people=friends"
+    const out = createFriendRequest(DB, req.userId, to, {
+      getUser, userPrefs, makeId, now, saveData, sendToUser, publicUser,
+      fromName: (req.user && req.user.name) || "Someone"
     });
-    res.json({ ok: true, requested: true, friend: serializeFriend(row, req.userId, getUser, publicUser) });
+    res.status(out.status).json(out.body);
   });
 
   app.get("/api/friends/requests", auth, (req, res) => {
@@ -345,5 +367,5 @@ function attach(ctx) {
 }
 
 module.exports = {
-  attach, ensure, blockedBetween, iBlocked, areFriends, friendship, canDm, REPORT_REASONS
+  attach, ensure, blockedBetween, iBlocked, areFriends, friendship, canDm, REPORT_REASONS, createFriendRequest, serializeFriend
 };

@@ -1,4 +1,4 @@
-GPS FAMILIA — architecture (v2.16.0)
+GPS FAMILIA — architecture (v2.17.0)
 ====================================
 Goal: add features without rewriting the working app. Keep app.js / server.js /
 rooms-server.js intact; new work goes in focused modules. See docs/ARCHITECTURE.md.

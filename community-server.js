@@ -124,8 +124,10 @@ function briefing(f, userId, opts) {
 function attach(ctx) {
   const {
     app, DB, saveData, auth, makeId, now, getUser, publicUser, publicFamily,
-    sharesFamily, hashPassword, createSession, sendToUser, broadcastToFamilyOf, DEMO
+    sharesFamily, hashPassword, createSession, sendToUser, broadcastToFamilyOf, DEMO,
+    userPrefs
   } = ctx;
+  const social = require("./social-server");
   const DEMO_PASSWORD = String(ctx.DEMO_PASSWORD || process.env.DEMO_PASSWORD || "demo123");
 
   function walkTrail(lat, lng, ts, n) {
@@ -697,20 +699,47 @@ function attach(ctx) {
     const families = DB.families.filter((f) => (f.members || []).includes(req.userId) && can(f, req.userId, "invite")).map((f) => ({
       id: f.id, name: f.name, privacy: f.privacy, memberCount: (f.members || []).length
     }));
+    social.ensure(DB);
+    const incomingFriends = (DB.friends || [])
+      .filter((fr) => fr.status === "pending" && fr.to === req.userId)
+      .map((fr) => {
+        const u = getUser(fr.from);
+        return { id: fr.id, kind: "friend", userId: fr.from, name: u ? u.name : "User", createdAt: fr.createdAt };
+      });
+    const outgoingFriends = (DB.friends || [])
+      .filter((fr) => fr.status === "pending" && fr.from === req.userId)
+      .map((fr) => {
+        const u = getUser(fr.to);
+        return { id: fr.id, kind: "friend", userId: fr.to, name: u ? u.name : "User", createdAt: fr.createdAt, waiting: true };
+      });
     res.json({
       ok: true,
       incomingJoins,
       incomingInvites,
+      incomingFriends,
       outgoing,
+      outgoingFriends,
       suggested,
       families,
-      counts: { incoming: incomingJoins.length + incomingInvites.length, outgoing: outgoing.length }
+      counts: {
+        incoming: incomingJoins.length + incomingInvites.length + incomingFriends.length,
+        outgoing: outgoing.length + outgoingFriends.length
+      }
     });
   });
 
   app.post("/api/people/invite", auth, (req, res) => {
     const { userId, familyId } = req.body || {};
-    const f = DB.families.find((x) => x.id === familyId);
+    if (!userId) return res.status(400).json({ error: "userId required" });
+    const fid = String(familyId || "").trim();
+    if (!fid) {
+      const out = social.createFriendRequest(DB, req.userId, userId, {
+        getUser, userPrefs, makeId, now, saveData, sendToUser, publicUser,
+        fromName: (req.user && req.user.name) || "Someone"
+      });
+      return res.status(out.status).json(out.body);
+    }
+    const f = DB.families.find((x) => x.id === fid);
     if (!f) return res.status(404).json({ error: "family not found" });
     if (!can(f, req.userId, "invite")) return res.status(403).json({ error: "you cannot invite to this family" });
     const target = getUser(userId);

@@ -18,10 +18,11 @@ module.exports = {
     await t.expectStatus(unauthQr, 401, "QR generate requires auth");
 
     const a = await t.register();
+    const bPhone = "303" + String(Date.now()).slice(-7);
     const b = await t.register({
       name: "Findable " + Date.now().toString(36),
       email: "find." + Date.now().toString(36) + "@familia.test",
-      phone: "3035550199"
+      phone: bPhone
     });
     const c = await t.register();
     if (!a || !b || !c) return;
@@ -60,6 +61,16 @@ module.exports = {
     await t.expectStatus(cancel, 200, "A cancels pending request");
     const relNone = await t.get("/api/users/" + encodeURIComponent(b.user.id) + "/relationship", { token: a.token });
     t.check("cancel returns to NONE", relNone.json && relNone.json.relationship && relNone.json.relationship.state === "NONE");
+
+    const solo = await t.register();
+    const inviteNoFam = await t.post("/api/people/invite", { userId: solo.user.id }, { token: a.token });
+    await t.expectStatus(inviteNoFam, 200, "invite without familyId is a friend request");
+    t.check("people/invite without a family still friends", !!(inviteNoFam.json && inviteNoFam.json.requested && inviteNoFam.json.kind === "friend"));
+    const hubSolo = await t.get("/api/people/hub", { token: solo.token });
+    await t.expectStatus(hubSolo, 200, "hub lists friend requests with no family");
+    t.check("hub incomingFriends without a family", !!(hubSolo.json && (hubSolo.json.incomingFriends || []).some((x) => x.userId === a.user.id)));
+    const accSolo = await t.post("/api/friends/" + encodeURIComponent(inviteNoFam.json.friend.id) + "/accept", {}, { token: solo.token });
+    await t.expectStatus(accSolo, 200, "accept friend with no family on either side");
 
     const req2 = await t.post("/api/friends/request", { userId: b.user.id }, { token: a.token });
     const fid = req2.json && req2.json.friend && req2.json.friend.id;
@@ -108,9 +119,9 @@ module.exports = {
     const plusPhone = await t.get("/api/search?q=" + encodeURIComponent("+13035550199"), { token: c.token });
     t.check("+1 phone does not leak when findByPhone nobody", !((plusPhone.json && plusPhone.json.users) || []).some((u) => u.id === b.user.id));
 
-    const d = await t.register({ phone: "7205550100" });
+    const d = await t.register({ phone: "720" + String(Date.now()).slice(-7) });
     if (d) {
-      const plusHit = await t.get("/api/search?q=" + encodeURIComponent("+1 720-555-0100"), { token: a.token });
+      const plusHit = await t.get("/api/search?q=" + encodeURIComponent("+1 " + d.creds.phone), { token: a.token });
       t.check("+1 search matches 10-digit phone", ((plusHit.json && plusHit.json.users) || []).some((u) => u.id === d.user.id));
     }
 

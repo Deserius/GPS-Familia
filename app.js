@@ -129,9 +129,9 @@ function legalTermsHtml(){
   return [
     "<p class=\"legal-lead\">Effective date: September 2, 2026. Please read these Terms of Use, Disclaimer, and Location Disclosure (the “Terms”) in full before using GPS FAMILIA. By tapping I Agree you enter a binding agreement.</p>",
     "<h4>1. Parties</h4>",
-    "<p>These Terms are a contract between you (“you,” “user”) and the operator of this application, <strong>Hustler Anomalies Enterprises</strong>, together with its owners, officers, employees, contractors, affiliates, successors, licensors, and the individual developer(s) who built or maintain GPS FAMILIA (together, the “Company,” “we,” “us”). GPS FAMILIA is a family location-sharing and messaging product. References to the “Service” mean the website, progressive web app, any wrapped Android/iOS shell, APIs, maps, notifications, and related content.</p>",
+    "<p>These Terms are a contract between you (“you,” “user”) and the operator of this application, <strong>Deserius Arte</strong>, together with its owners, officers, employees, contractors, affiliates, successors, licensors, and the individual developer(s) who built or maintain GPS FAMILIA (together, the “Company,” “we,” “us”). GPS FAMILIA is a family location-sharing and messaging product. References to the “Service” mean the website, progressive web app, any wrapped Android/iOS shell, APIs, maps, notifications, and related content.</p>",
     "<h4>2. Acceptance</h4>",
-    "<p>You must be at least 18 years old (or the age of majority where you live) to accept these Terms. If you use the Service on behalf of a household or organization, you represent that you have authority to bind that group. If you do not agree, you must not create an account, share location, send messages, or otherwise use the Service. Continued use after we post an updated version is acceptance of the new Terms.</p>",
+    "<p>Adult accounts are for people 18 or older (or the age of majority where you live). A parent or guardian may register a Child account for a minor and is responsible for that child’s use. Child accounts cannot use Marketplace and may only message family and friends. They can receive family invites and friend requests. If you do not agree, you must not create an account. Continued use after we post an updated version is acceptance of the new Terms.</p>",
     "<h4>3. Nature of the Service</h4>",
     "<p>GPS FAMILIA lets consenting adults share approximate device location with people they place in a “family,” send encrypted messages, post to a community feed, and fire an SOS ping to families they belong to. The Service is a consumer convenience tool. It is <strong>not</strong> a professional monitoring service, not a child-safety product, not medical or legal advice, and not a substitute for 911, law enforcement, or any licensed emergency system.</p>",
     "<h4>4. GPS, location, and device permissions — read this</h4>",
@@ -153,11 +153,11 @@ function legalTermsHtml(){
     "<p>Google Sign-In, map providers, hosting companies, SMS/email gateways, and browser push vendors are independent. Their outages, terms, and data practices are outside our control. The Company is not liable for third-party acts or omissions.</p>",
     "<h4>12. Disclaimer of warranties</h4>",
     "<p>THE SERVICE IS PROVIDED “AS IS” AND “AS AVAILABLE,” WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, QUIET ENJOYMENT, ACCURACY OF LOCATION, UNINTERRUPTED ACCESS, OR NON-INFRINGEMENT. We do not warrant that maps, messages, SOS, or notifications will be timely, complete, or error-free.</p>",
-    "<h4>13. Limitation of liability — Hustler Anomalies Enterprises and associated parties</h4>",
+    "<h4>13. Limitation of liability — Deserius Arte and associated parties</h4>",
     "<p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, <strong>HUSTLER ANOMALIES ENTERPRISES, THE DEVELOPER(S), AND ALL ASSOCIATED PARTIES</strong> SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, PUNITIVE, OR PERSONAL-INJURY DAMAGES, OR FOR LOST PROFITS, LOST DATA, LOST LOCATION HISTORY, BUSINESS INTERRUPTION, COST OF SUBSTITUTE SERVICES, OR DAMAGES ARISING FROM: (A) USE OR INABILITY TO USE THE SERVICE; (B) LOCATION THAT IS WRONG, LATE, MISSING, OR SEEN BY SOMEONE YOU DID NOT INTEND; (C) FAILURE OF SOS, CHAT, OR PHONE NOTIFICATIONS; (D) UNAUTHORIZED ACCESS TO AN ACCOUNT; (E) CONDUCT OF OTHER USERS, INCLUDING STALKING OR MISUSE; (F) DEVICE, OS, NETWORK, OR THIRD-PARTY FAILURES. THIS LIMITATION APPLIES IN CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR ANY OTHER THEORY, EVEN IF WE WERE ADVISED OF THE POSSIBILITY OF DAMAGES.</p>",
     "<p>IF ANY LIABILITY IS NEVERTHELESS IMPOSED, THE TOTAL LIABILITY OF HUSTLER ANOMALIES ENTERPRISES, THE DEVELOPER(S), AND ASSOCIATED PARTIES FOR ALL CLAIMS TOGETHER SHALL NOT EXCEED THE GREATER OF (I) TEN U.S. DOLLARS (US $10.00) OR (II) THE AMOUNT YOU PAID US FOR THE SERVICE IN THE THREE MONTHS BEFORE THE CLAIM (WHICH IS ZERO IF THE SERVICE IS FREE). SOME JURISDICTIONS DO NOT ALLOW CERTAIN LIMITATIONS; IN THOSE PLACES OUR LIABILITY IS LIMITED TO THE FULLEST EXTENT THE LAW ALLOWS. YOU ACKNOWLEDGE THAT LOCATION SHARING AND MESSAGING CARRY INHERENT RISKS AND THAT YOU USE THE SERVICE AT YOUR OWN RISK.</p>",
     "<h4>14. Release and indemnification</h4>",
-    "<p>You release and will indemnify, defend, and hold harmless Hustler Anomalies Enterprises, the developer(s), and associated parties from any claim, damage, loss, or expense (including reasonable attorneys’ fees) arising out of: your use of the Service; your location sharing; content you send; your violation of these Terms or of law; or any dispute with another user or a third party. We may assume exclusive defense of any matter subject to indemnification.</p>",
+    "<p>You release and will indemnify, defend, and hold harmless Deserius Arte, the developer(s), and associated parties from any claim, damage, loss, or expense (including reasonable attorneys’ fees) arising out of: your use of the Service; your location sharing; content you send; your violation of these Terms or of law; or any dispute with another user or a third party. We may assume exclusive defense of any matter subject to indemnification.</p>",
     "<h4>15. Termination</h4>",
     "<p>You may stop using the Service at any time (Track Off, sign out, delete the site data). We may suspend or terminate access immediately, with or without cause. Sections that by nature should survive (including 5, 12–14, 16–18) survive termination.</p>",
     "<h4>16. Changes</h4>",
@@ -167,7 +167,7 @@ function legalTermsHtml(){
     "<h4>18. Miscellaneous</h4>",
     "<p>If a provision is unenforceable, the rest remains in effect. These Terms are the entire agreement regarding the Service and supersede prior understandings. Failure to enforce a term is not a waiver. You may not assign these Terms without our consent; we may assign them. Headings are for convenience only. No agency, partnership, or employment is created.</p>",
     "<h4>19. Contact</h4>",
-    "<p>Questions about these Terms: Hustler Anomalies Enterprises — in-app Help → Terms, or the operator who hosts this copy of GPS FAMILIA. Nothing in this document is legal advice to you; it allocates risk between you and the Company.</p>"
+    "<p>Questions about these Terms: Deserius Arte — in-app Help → Terms, or the operator who hosts this copy of GPS FAMILIA. Nothing in this document is legal advice to you; it allocates risk between you and the Company.</p>"
   ].join("");
 }
 
@@ -298,7 +298,7 @@ async function showLegalGate(){
       kind: "legal",
       wide: true,
       title: "Terms of Use & Disclaimer",
-      kicker: "Hustler Anomalies Enterprises",
+      kicker: "Deserius Arte",
       html: legalTermsHtml(),
       requireCheck: true,
       checkLabel: "I am 18+, I have read these Terms, and I agree.",
@@ -606,11 +606,24 @@ async function ensureAlertPermission(opts){
   return true;
 }
 
+async function primeDeviceMedia(){
+  try{
+    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      (stream.getTracks() || []).forEach((tr) => { try{ tr.stop(); }catch(e){} });
+    }
+  }catch(e){}
+  try{
+    if(navigator.geolocation) navigator.geolocation.getCurrentPosition(()=>{}, ()=>{}, { timeout: 8000, maximumAge: 60000, enableHighAccuracy: false });
+  }catch(e){}
+}
+
 async function afterSignIn(opts){
   opts = opts || {};
   closeAllModals();
   updateUIForSession();
   await consumePendingInvite();
+  await primeDeviceMedia();
   if(opts.created) await runSignupPermissions();
   else {
     await ensureAlertPermission();
@@ -859,7 +872,7 @@ function wsSend(obj){
 function handleRealtime(msg){
   if(!msg || !msg.type) return;
   if(msg.type === "location"){
-    applyRemoteLocation(msg.userId, msg.lat, msg.lng, msg.ts);
+    applyRemoteLocation(msg.userId, msg.lat, msg.lng, msg.ts, msg.tracking);
     } else if(msg.type === "message" && msg.message){
     upsertServerMessage(msg.message);
     updateInboxBadge();
@@ -1005,7 +1018,10 @@ function cacheUserFromServer(su){
     email: su.email != null ? su.email : prev.email,
     phone: su.phone != null ? su.phone : prev.phone,
     online: su.online,
-    inFamily: su.inFamily
+    inFamily: su.inFamily,
+    tracking: !!su.tracking,
+    child: !!su.child,
+    accountType: su.accountType || prev.accountType
   });
   if(su.lastLocation) merged.lastLocation = su.lastLocation;
   else if(!isFamilyWith(su.id) && currentSession()?.userId !== su.id){
@@ -1013,6 +1029,10 @@ function cacheUserFromServer(su){
     delete merged.locationHistory;
   }
   if(su.appearOnMap === false && currentSession()?.userId !== su.id){
+    delete merged.lastLocation;
+  }
+  if(su.tracking === false && currentSession()?.userId !== su.id){
+    merged.tracking = false;
     delete merged.lastLocation;
   }
   if(su.locationHistory) merged.locationHistory = su.locationHistory;
@@ -1257,7 +1277,7 @@ function renderHelp(startTab){
       d.append(
         make("div",{className:"help-kicker"}, "GPS FAMILIA"),
         make("h3",{}, "Family. Loyalty. Location."),
-        make("p",{}, "A private family locator and messenger. Sign in, join as many families as you want, and only people who share a family with you can ever see your pin on the map."),
+        make("p",{}, "A private family locator and messenger by Deserius Arte. Sign in, join as many families as you want, and only people who share a family with you can ever see your pin — and only while Track is On."),
         make("div",{className:"help-callout"}, "People you find by name or phone can be messaged and invited — they never appear on the map until they join one of your families."),
         make("h4",{}, "The bar at the top"),
         make("ul",{},
@@ -1321,8 +1341,8 @@ function renderHelp(startTab){
     families: () => {
       const d = make("div");
       d.append(
-        make("h3",{}, "Families — you can join many"),
-        make("p",{}, "A family is a consent circle. Location is shared with everyone who is in a family with you. Joining another crew never removes you from the first."),
+        make("h3",{}, "Families — location safety groups"),
+        make("p",{}, "A family is a consent circle for legal, safety location sharing — not a gate for the rest of the app. You can send and accept friend requests, messages, and connect QR without creating a family. Location pins are only visible to people who share a family with you, and only while Track is On. Joining another crew never removes you from the first."),
         make("p",{}, "Open ☰ or 👥 → Create / Join Family. The card is compact: Family name and Password sit side by side as normal-sized boxes, Privacy + Create on the next row, then Join with an invite link, QR URL, or token."),
         make("p",{}, "A family link or QR always opens GPS FAMILIA. Phone camera, in-app QR, and paste all use the same invite. You register or sign in first — Create / Join is not shown until you have an account. After sign-in you see who invited you, the members of that family, their roles, and the rules. Accept to join, or Decline. If you already belong, you only see the briefing."),
         make("ul",{},
@@ -1446,7 +1466,7 @@ function renderHelp(startTab){
       const d = make("div");
       d.append(
         make("h3",{}, "Tracking"),
-        make("p",{}, "Track On uses your phone's GPS and updates family devices within a second or two. The footer pill turns teal when you are live."),
+        make("p",{}, "Track On uses your phone's GPS and updates family devices within a second or two. Live pins glow and pulse in gold (family) or teal (you). Last-known pins stay on YOUR map only — other people cannot see you until Track is On."),
         make("p",{}, "Location history keeps recording even after you leave or close the app. It only stops when you tap Track Off. Reopening GPS FAMILIA resumes tracking automatically if Track was still On."),
         make("p",{}, "While Track is On, a trail pin is saved every minute. Open ☰ → Location history & trail — or tap a family pin → History / Map trail."),
         make("ul",{},
@@ -1548,7 +1568,7 @@ function renderHelp(startTab){
         make("div",{className:"help-kicker"}, "Legal"),
         make("h3",{}, "Terms of Use")
       );
-      d.appendChild(make("p",{className:"small-muted"}, "The agreement you accepted on first launch. Hustler Anomalies Enterprises, the developer, and associated parties provide GPS FAMILIA as-is."));
+      d.appendChild(make("p",{className:"small-muted"}, "The agreement you accepted on first launch. Deserius Arte, the developer, and associated parties provide GPS FAMILIA as-is."));
       const box = make("div",{className:"legal-scroll"});
       box.innerHTML = legalTermsHtml();
       d.appendChild(box);
@@ -1698,6 +1718,11 @@ function renderAuth(opts){
     const row = make("div",{className:"auth-fields"});
     row.append(name, email, phone, pass, pass2);
 
+    const childRow = make("label",{className:"small-muted", style:"display:flex;align-items:flex-start;gap:8px;margin:8px 0;cursor:pointer"});
+    const childBox = make("input",{type:"checkbox"});
+    childBox.style.marginTop = "3px";
+    childRow.append(childBox, make("span",{}, "This is a child's account (under 18). A parent/guardian must agree. Child accounts cannot use Marketplace and can only message family and friends."));
+
     const feedback = make("div",{className:"small-muted", style:"min-height:18px;margin-top:6px;"},"");
 
     const sendOtpBtn = make("button",{className:"btn small secondary", type:"button"}, "Send OTP to phone");
@@ -1729,8 +1754,8 @@ function renderAuth(opts){
       const phoneTxt = (phone.value || "").trim();
 
       try{
-        const j = await api("/api/register", { method:"POST", body: { name: nameTxt, email: em, phone: phoneTxt, password: pass.value } });
-        const localUser = { id: j.user.id, name: j.user.name || nameTxt, email: em, phone: phoneTxt, createdAt: now(), locationHistory: [] };
+        const j = await api("/api/register", { method:"POST", body: { name: nameTxt, email: em, phone: phoneTxt, password: pass.value, accountType: childBox.checked ? "child" : "adult" } });
+        const localUser = { id: j.user.id, name: j.user.name || nameTxt, email: em, phone: phoneTxt, createdAt: now(), locationHistory: [], accountType: childBox.checked ? "child" : "adult", child: !!childBox.checked };
         let usersLocal = storage.get(DB.usersKey) || [];
         if(!usersLocal.find(u => u.id === localUser.id)) usersLocal.push(localUser);
         storage.set(DB.usersKey, usersLocal);
@@ -1769,6 +1794,7 @@ function renderAuth(opts){
     };
 
     formWrap.appendChild(row);
+    formWrap.appendChild(childRow);
     formWrap.appendChild(feedback);
     formWrap.appendChild(make("div",{className:"row", style:"gap:6px;margin-top:4px"}, sendOtpBtn, submit));
   }
@@ -1816,14 +1842,19 @@ function renderCreateJoin(prefillInvite){
   const createBtn = make("button",{className:"btn small", type:"button"}, "Create");
 
   createBtn.onclick = async () => {
-    const s = currentSession(); if(!s){ notice("Sign in first"); return; }
-    const payload = { name: name.value, password: pass.value, privacy: privacy.value };
-    const j = await apiTry("/api/families", { method:"POST", body: payload });
+    const s = currentSession();
+    if(!s || !s.sessionToken){ notice("Sign in first"); renderAuth(); return; }
+    const nm = (name.value || "").trim() || (((getUserById(s.userId) || {}).name || "My") + "'s Family");
+    createBtn.disabled = true;
+    const j = await apiCatch("/api/families", { method:"POST", body: { name: nm, password: pass.value, privacy: privacy.value } });
+    createBtn.disabled = false;
     if(j && j.family){
       cacheFamily(j.family);
       closeModal();
+      notice("Family created — " + j.family.name);
       openShareModal(j.family);
       updateFamilyMarkers();
+      syncFromServer();
       if(j.briefing) setTimeout(() => showFamilyBriefing(j.briefing), 400);
       return;
     }
@@ -2317,10 +2348,11 @@ function renderDeleteAccount(){
 
 function renderAboutDeveloper(){
   const wrap = make("div");
-  wrap.appendChild(make("div",{className:"help-kicker"}, "Hustler Anomalies Enterprises"));
+  wrap.appendChild(make("div",{className:"help-kicker"}, "Deserius Arte"));
   wrap.appendChild(make("h3",{}, "About GPS FAMILIA"));
   wrap.appendChild(make("p",{}, "GPS FAMILIA is a private family locator and encrypted messenger. It is a consumer convenience tool — not 911, not a surveillance product."));
-  wrap.appendChild(make("p",{className:"small-muted"}, "Operator: Hustler Anomalies Enterprises, together with the developer(s) and associated parties. The Service is provided as-is. Full legal terms live in Help → Terms."));
+  wrap.appendChild(make("p",{}, "Developer: Deserius Arte"));
+  wrap.appendChild(make("p",{className:"small-muted"}, "Copyright © 2026 Deserius Arte. The Service is provided as-is. Full legal terms live in Help → Terms."));
   wrap.appendChild(make("p",{}, "Family. Loyalty. Location."));
   const terms = make("button",{className:"btn small", type:"button"}, "Open Terms");
   terms.onclick = () => { closeModal(); renderHelp("terms"); };
@@ -2486,14 +2518,18 @@ function renderFamilyList(prefillQ, opts){
     reqBox.appendChild(make("div",{className:"small-muted"}, "Loading requests…"));
     const hub = await apiTry("/api/people/hub");
     reqBox.innerHTML = "";
-    const incoming = [...((hub && hub.incomingJoins) || []), ...((hub && hub.incomingInvites) || [])];
-    const outgoing = (hub && hub.outgoing) || [];
+    const incoming = [
+      ...((hub && hub.incomingFriends) || []),
+      ...((hub && hub.incomingJoins) || []),
+      ...((hub && hub.incomingInvites) || [])
+    ];
+    const outgoing = [...((hub && hub.outgoing) || []), ...((hub && hub.outgoingFriends) || [])];
     if(tabMap.requests){
       const n = incoming.length;
       tabMap.requests.textContent = n ? ("Requests · " + n) : "Requests";
     }
     if(!incoming.length && !outgoing.length){
-      reqBox.appendChild(make("div",{className:"privacy-note"}, "No pending invites. Search for someone and tap Invite, or share a family link."));
+      reqBox.appendChild(make("div",{className:"privacy-note"}, "No pending friend or family requests. Search for someone and tap Add friend — no family required."));
       return;
     }
     function reqRow(r, mineIncoming){
@@ -2502,7 +2538,9 @@ function renderFamilyList(prefillQ, opts){
       av.innerHTML = getAvatarFor(getUserById(r.userId) || { id: r.userId, name: r.name });
       const info = make("div",{style:"flex:1;min-width:0"});
       info.appendChild(make("div",{style:"font-weight:800"}, r.name || "Member"));
-      const line = r.kind === "invite"
+      const line = r.kind === "friend"
+        ? ((r.name || "Someone") + " sent you a friend request")
+        : r.kind === "invite"
         ? ((r.fromName || "Family") + " invited you to " + (r.familyName || "a family"))
         : ((r.name || "Someone") + " wants to join " + (r.familyName || "your family"));
       info.appendChild(make("div",{className:"small-muted"}, line));
@@ -2511,12 +2549,18 @@ function renderFamilyList(prefillQ, opts){
         const yes = make("button",{className:"btn small", type:"button"}, "Accept");
         const no = make("button",{className:"btn small secondary", type:"button"}, "Decline");
         yes.onclick = async () => {
-          const j = await apiTry("/api/people/requests/" + encodeURIComponent(r.id) + "/accept", { method:"POST", body: {} });
+          const path = r.kind === "friend"
+            ? "/api/friends/" + encodeURIComponent(r.id) + "/accept"
+            : "/api/people/requests/" + encodeURIComponent(r.id) + "/accept";
+          const j = await apiTry(path, { method:"POST", body: {} });
           if(j && j.ok) { await notice("Accepted."); paintRequests(); syncFromServer(); updateFamilyMarkers(); if(j.briefing) showFamilyBriefing(j.briefing); }
           else notice("Could not accept.");
         };
         no.onclick = async () => {
-          await apiTry("/api/people/requests/" + encodeURIComponent(r.id) + "/decline", { method:"POST", body: {} });
+          const path = r.kind === "friend"
+            ? "/api/friends/" + encodeURIComponent(r.id) + "/decline"
+            : "/api/people/requests/" + encodeURIComponent(r.id) + "/decline";
+          await apiTry(path, { method:"POST", body: {} });
           paintRequests();
         };
         actions.append(yes, no);
@@ -2573,8 +2617,8 @@ function renderFamilyList(prefillQ, opts){
     let remote = await apiTry("/api/search" + (query.length >= 1 ? ("?q=" + encodeURIComponent(query)) : ""));
 
     let famMatches = remote && remote.families
-      ? remote.families.filter(f => !f.isMember)
-      : families.filter(f => (f.privacy === "public") && (!qLower || (f.name||"").toLowerCase().includes(qLower) || (f.id && f.id.includes(qLower))));
+      ? remote.families.slice()
+      : families.filter(f => (f.privacy === "public" || (currentSession() && (f.members||[]).includes(currentSession().userId))) && (!qLower || (f.name||"").toLowerCase().includes(qLower) || (f.id && f.id.includes(qLower))));
 
     let qUsers = remote && remote.users
       ? remote.users
@@ -2615,9 +2659,23 @@ function renderFamilyList(prefillQ, opts){
       qUsers.forEach(u => resultsWrap.appendChild(userCard(u)));
     }
 
-    if(famMatches.length){
+    const mineFams = famMatches.filter(f => f.isMember);
+    const joinFams = famMatches.filter(f => !f.isMember);
+    if(tab === "families" && mineFams.length){
+      resultsWrap.appendChild(make("div",{className:"small-muted", style:"margin:8px 0 4px"}, "Your families (stay listed until deleted)"));
+      mineFams.forEach(f => {
+        const card = make("div",{className:"family-card"});
+        const count = f.memberCount != null ? f.memberCount : (f.members||[]).length;
+        card.appendChild(make("div",{}, make("div",{}, f.name), make("div",{className:"small-muted"}, (f.privacy || "private") + " • " + count + " members")));
+        const qr = make("button",{className:"btn small", type:"button"}, "Invite / QR");
+        qr.onclick = () => { const fam = myFamilies().find(x => x.id === f.id) || f; openShareModal(fam); };
+        card.appendChild(qr);
+        resultsWrap.appendChild(card);
+      });
+    }
+    if(joinFams.length){
       resultsWrap.appendChild(make("div",{className:"small-muted", style:"margin:8px 0 4px"}, "Public families you can join"));
-      famMatches.forEach(f=>{
+      joinFams.forEach(f=>{
         const card = make("div",{className:"family-card"});
         const count = f.memberCount != null ? f.memberCount : (f.members||[]).length;
         const info = make("div",{}, make("div",{}, f.name), make("div",{className:"small-muted"}, `${count} members • you can join in addition to families you already have`));
@@ -2698,6 +2756,9 @@ function renderFamilyList(prefillQ, opts){
 
   const myWrap = make("div",{style:"margin-top:12px"});
   myWrap.appendChild(make("h3",{}, "Your Families"));
+  const createFamBtn = make("button",{className:"btn small", type:"button"}, "Create family");
+  createFamBtn.onclick = () => { closeModal(); renderCreateJoin(); };
+  myWrap.appendChild(createFamBtn);
   const list = make("div",{className:"family-list"});
   const s = currentSession();
   if(!s) { list.appendChild(make("div",{}, "Sign in to see families.")); }
@@ -2915,10 +2976,15 @@ async function refreshMapPins(){
   await syncFromServer();
   const locs = await apiTry("/api/locations");
   if(locs && Array.isArray(locs.locations)){
+    const seen = new Set();
     locs.locations.forEach(l => {
       if(!l || !l.userId) return;
-      applyRemoteLocation(l.userId, l.lat, l.lng, l.ts || now());
+      seen.add(l.userId);
+      applyRemoteLocation(l.userId, l.lat, l.lng, l.ts || now(), l.tracking !== false);
     });
+    (myFamilies() || []).forEach(f => (f.members || []).forEach(id => {
+      if(s && id !== s.userId && !seen.has(id)) applyRemoteLocation(id, 0, 0, now(), false);
+    }));
   }
   updateFamilyMarkers();
   if(map) try{ map.invalidateSize(true); }catch(e){}
@@ -3913,31 +3979,40 @@ async function renderInvitePerson(user){
   const s = currentSession(); if(!s) return renderAuth();
   const fams = myFamilies();
   const wrap = make("div",{style:"min-width:min(92vw,360px);display:flex;flex-direction:column;gap:10px"});
-  wrap.appendChild(make("div",{className:"help-kicker"}, "Invite"));
-  wrap.appendChild(make("h3",{}, "Invite " + (user.name || "them")));
-  wrap.appendChild(make("p",{className:"small-muted"}, "They join the family you pick. Location stays hidden until they accept and belong."));
-  if(!fams.length){
-    wrap.appendChild(make("div",{className:"privacy-note"}, "Create a family first."));
-    const go = make("button",{className:"btn", type:"button"}, "Create family");
+  wrap.appendChild(make("div",{className:"help-kicker"}, "Connect"));
+  wrap.appendChild(make("h3",{}, "Connect with " + (user.name || "them")));
+  wrap.appendChild(make("p",{className:"small-muted"}, "Friend requests do not need a family. A family is only a location-safety group — people who can see each other's pins while Track is On."));
+  const add = make("button",{className:"btn", type:"button"}, "Send friend request");
+  add.onclick = async () => {
+    const j = await apiCatch("/api/friends/request", { method:"POST", body: { userId: user.id } });
+    if(j && (j.ok || j.requested || j.accepted || j.already)){
+      await notice(j.accepted ? "You're now friends." : j.already ? "You're already friends." : "Friend request sent. They Accept from Find people → Requests.");
+      closeModal();
+    } else notice((j && j.error) || "Could not send request.");
+  };
+  wrap.appendChild(add);
+  if(fams.length){
+    wrap.appendChild(make("div",{className:"small-muted", style:"margin-top:6px"}, "Optional — invite them into a location family. They must Accept."));
+    const sel = make("select",{className:"input"});
+    fams.forEach(f => sel.appendChild(make("option",{value:f.id}, f.name + " · " + (f.privacy||"private"))));
+    const send = make("button",{className:"btn secondary", type:"button"}, "Invite to family");
+    send.onclick = async () => {
+      const j = await apiCatch("/api/people/invite", { method:"POST", body: { userId: user.id, familyId: sel.value } });
+      if(j && j.already) await notice("They are already in that family.");
+      else if(j && (j.ok || j.request || j.requested)) { await notice("Family invite sent. They Accept from Find people → Requests."); closeModal(); }
+      else notice((j && j.error) || "Could not invite");
+    };
+    wrap.append(make("label",{}, "Family"), sel, send);
+  } else {
+    wrap.appendChild(make("div",{className:"privacy-note"}, "Families are optional. Create one only if you want a location-safety group."));
+    const go = make("button",{className:"btn secondary", type:"button"}, "Create a location family");
     go.onclick = () => { closeModal(); renderCreateJoin(); };
     wrap.appendChild(go);
-    return showModal(wrap);
   }
-  const sel = make("select",{className:"input"});
-  fams.forEach(f => sel.appendChild(make("option",{value:f.id}, f.name + " · " + (f.privacy||"private"))));
-  const send = make("button",{className:"btn", type:"button"}, "Send invite");
-  send.onclick = async () => {
-    try{
-      const j = await api("/api/people/invite", { method:"POST", body: { userId: user.id, familyId: sel.value } });
-      if(j && j.already) await notice("They are already in that family.");
-      else await notice("Invite sent. They can Accept from Find people → Requests.");
-      closeModal();
-    }catch(e){ notice(e.message || "Could not invite"); }
-  };
-  const msg = make("button",{className:"btn secondary", type:"button"}, "Message instead");
+  const msg = make("button",{className:"btn secondary", type:"button"}, "Message");
   msg.onclick = () => { closeAllModals(); renderMessagesForUser(user.id); };
-  wrap.append(make("label",{}, "Family"), sel, make("div",{className:"row", style:"margin-top:8px"}, send, msg));
-  showModal(wrap);
+  wrap.appendChild(msg);
+  showModal(wrap, { variant: "form" });
 }
 
 
@@ -4541,6 +4616,7 @@ function updateFamilyMarkers(){
   const families = storage.get(DB.familiesKey) || [];
   const myFams = families.filter(f => Array.isArray(f.members) && f.members.includes(s.userId));
   const memberIds = new Set(myFams.flatMap(f=>f.members));
+  memberIds.add(s.userId);
 
   markers = markers || {};
 
@@ -4549,7 +4625,13 @@ function updateFamilyMarkers(){
       const u = getUserById(id);
       if(!u) return;
       const prefs = memberPrefs(u);
-      if(s.userId !== id && prefs.appearOnMap === false){
+      const self = id === s.userId;
+      const live = !!(self ? trackingEnabled : (u.tracking || (u.lastLocation && u.lastLocation.live)));
+      if(!self && prefs.appearOnMap === false){
+        if(markers[id]){ try{ map.removeLayer(markers[id].marker); }catch(e){} delete markers[id]; }
+        return;
+      }
+      if(!self && !live){
         if(markers[id]){ try{ map.removeLayer(markers[id].marker); }catch(e){} delete markers[id]; }
         return;
       }
@@ -4561,16 +4643,20 @@ function updateFamilyMarkers(){
           wrapper.className = "member-marker-wrap";
 
           const imgWrap = document.createElement("div");
+          imgWrap.className = "pin-core";
           imgWrap.style.width = "44px";
           imgWrap.style.height = "44px";
           imgWrap.style.borderRadius = "50%";
           imgWrap.style.overflow = "hidden";
-          imgWrap.style.boxShadow = "0 6px 14px rgba(0,0,0,0.45)";
-          imgWrap.style.border = "3px solid rgba(0,0,0,0.45)";
           imgWrap.style.display = "flex";
           imgWrap.style.alignItems = "center";
           imgWrap.style.justifyContent = "center";
-          imgWrap.style.background = id===s.userId ? "var(--accent)" : "#ffb86b";
+          wrapper.classList.toggle("is-self", self);
+          wrapper.classList.toggle("is-live", live);
+          wrapper.classList.toggle("is-stale", !live);
+          imgWrap.style.border = live ? (self ? "3px solid #3ee0b0" : "3px solid #f5d061") : "3px solid #6b7c86";
+          imgWrap.style.background = live ? (self ? "var(--accent)" : "#f5d061") : "#4a5a63";
+          imgWrap.style.boxShadow = live ? "0 0 0 0 rgba(62,224,176,.55)" : "0 6px 14px rgba(0,0,0,0.45)";
 
           const pImg = getProfileImageForUser(id);
           if(pImg){
@@ -4720,22 +4806,46 @@ function updateFamilyMarkers(){
 function publishLocation(lat, lng, type){
   const s = currentSession(); if(!s) return;
   lastFix = { lat, lng, ts: now() };
+  const kind = type || "live";
+  const live = !!(trackingEnabled && kind !== "preview" && kind !== "approx");
   const users = storage.get(DB.usersKey) || [];
   let u = users.find(x=>x.id===s.userId);
   if(u){
-    u.lastLocation = { lat, lng, ts: lastFix.ts };
+    u.lastLocation = { lat, lng, ts: lastFix.ts, live };
+    u.tracking = live;
     saveUser(u);
   } else {
-    u = { id: s.userId, name: "User", lastLocation: {lat, lng, ts: lastFix.ts}, locationHistory: [] };
+    u = { id: s.userId, name: "User", lastLocation: {lat, lng, ts: lastFix.ts, live}, locationHistory: [], tracking: live };
     saveUser(u);
   }
-  wsSend({ type:"location", lat, lng, kind: type || "live" });
-  apiTry("/api/location", { method:"POST", body: { lat, lng, type: type || "live" } });
+  wsSend({ type:"location", lat, lng, kind, tracking: live });
+  apiTry("/api/location", { method:"POST", body: { lat, lng, type: kind, tracking: live } });
   if(trackingEnabled && !historyPrimed){
     historyPrimed = true;
     recordHistoryPoint(lat, lng, "minute");
   }
   updateFamilyMarkers();
+}
+
+function dropSelfPin(){
+  const s = currentSession(); if(!s) return;
+  const place = (lat, lng) => {
+    publishLocation(lat, lng, "preview");
+    if(map) try{ map.flyTo([lat, lng], 13); }catch(e){}
+  };
+  if("geolocation" in navigator){
+    navigator.geolocation.getCurrentPosition(
+      (pos) => place(pos.coords.latitude, pos.coords.longitude),
+      () => notice("Allow location to pin yourself on the map. Others still cannot see you until Track is On."),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+    );
+  }
+}
+
+function isChildMe(){
+  const s = currentSession();
+  const u = s && getUserById(s.userId);
+  return !!(u && (u.accountType === "child" || u.child));
 }
 
 let bgLifecycleBound = false;
@@ -4902,6 +5012,15 @@ function stopTracking(){
   if(btn){ btn.textContent = t("nav.trackOff"); btn.classList.remove("on"); btn.style.color = ""; btn.setAttribute("aria-pressed","false"); }
   if(watchId && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
   watchId = null;
+  apiTry("/api/me/tracking", { method:"POST", body: { on: false } });
+  const s = currentSession();
+  const u = s && getUserById(s.userId);
+  if(u){
+    u.tracking = false;
+    if(u.lastLocation) u.lastLocation.live = false;
+    saveUser(u);
+  }
+  updateFamilyMarkers();
 }
 
 function updateUIForSession(){
@@ -4919,6 +5038,10 @@ function updateUIForSession(){
   }
   updateProfileThumb();
   updateInboxBadge();
+  const kid = isChildMe();
+  ["#btn-market", "#app-dock [data-dock=\"market\"]"].forEach((sel) => {
+    document.querySelectorAll(sel).forEach((el) => { el.style.display = kid ? "none" : ""; });
+  });
   if(qs("#account-drawer") && qs("#account-drawer").classList.contains("open")) paintAccountDrawer();
 }
 
@@ -4972,6 +5095,7 @@ function closeMarketPanel(){
 }
 function openMarketPanel(opts){
   if(!currentSession()) return notice("Sign in first");
+  if(isChildMe()) return notice("Marketplace is off for child accounts.");
   closeDrawer();
   closeAccountDrawer();
   closeFeedPanel();

@@ -3,7 +3,7 @@
 Family location sharing, **encrypted** messaging, and voice/video calling.
 Other users’ locations are **never** shown unless they belong to one of your families.
 
-**Version 2.16.0** — people discovery, relationship state, message requests, in-app notifications, personal/payment QR (validate then confirm — never auto-friend or auto-join). Built on the 2.15 modular monolith.
+**Version 2.17.0** — live tracking pins, reliable family create, child accounts, Deserius Arte copyright. Built on people discovery, relationship state, message requests, in-app notifications, personal/payment QR (validate then confirm — never auto-friend or auto-join). Built on the 2.15 modular monolith.
 
 ## Run locally (one command)
 
@@ -45,4 +45,4 @@ npm run test:sast
 
 Reports: `tests/reports/latest.md`.
 
-Health: `GET /api/health` and `GET /api/ready` → `version: "2.16.0"`.
+Health: `GET /api/health` and `GET /api/ready` → `version: "2.17.0"`.

@@ -12,7 +12,7 @@ module.exports = {
   async run(t) {
     t.section("Architecture & module boundaries");
 
-    t.check("config VERSION 2.16.0", VERSION === "2.16.0", VERSION);
+    t.check("config VERSION 2.17.0", VERSION === "2.17.0", VERSION);
     const cfg = getConfig();
     t.check("config has PORT/HOST", !!(cfg.PORT && cfg.HOST));
     const pub = getPublicConfig();
@@ -42,7 +42,7 @@ module.exports = {
 
     const ready = await t.get("/api/ready");
     await t.expectStatus(ready, 200, "GET /api/ready");
-    t.check("ready.ready", !!(ready.json && ready.json.ready === true && ready.json.version === "2.16.0"));
+    t.check("ready.ready", !!(ready.json && ready.json.ready === true && ready.json.version === "2.17.0"));
 
     const blocked = [
       "/server.js", "/community-server.js", "/security.js", "/config/index.js",

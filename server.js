@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * GPS FAMILIA HTTP + WebSocket composition root (v2.16.0)
+ * GPS FAMILIA HTTP + WebSocket composition root (v2.17.0)
  * Auth is Bearer-only on REST. Secrets live in .env / f360_data.json (gitignored).
  * Domain logic lives in *-server.js and modules/*. Do not flatten those back in.
  * Demo passwords are never returned by /api/config. See SECURITY.md and docs/.
@@ -244,6 +244,9 @@ const PREF_ENUMS = {
 function userPrefs(u) {
   return Object.assign({}, defaultPrefs(), (u && u.prefs && typeof u.prefs === "object") ? u.prefs : {});
 }
+function isChild(u) {
+  return !!(u && (u.accountType === "child" || u.child === true));
+}
 function fuzzCoord(n) {
   return Math.round(Number(n) * 100) / 100;
 }
@@ -289,9 +292,14 @@ function publicUser(u, viewerId, opts = {}) {
     blocked: !!(viewerId && social.iBlocked(DB, viewerId, u.id)),
     online: (prefs.showOnlineStatus !== false || self || family) ? isOnline(u.id) : false,
     hasProfile: !!(u.profileImage),
-    appearOnMap: prefs.appearOnMap !== false
+    appearOnMap: prefs.appearOnMap !== false,
+    tracking: !!u.tracking,
+    child: isChild(u)
   };
-  if (self) out.prefs = prefs;
+  if (self) {
+    out.prefs = prefs;
+    out.accountType = isChild(u) ? "child" : (u.accountType || "adult");
+  }
   if (self || family || friends || opts.forSearch) {
     const hideContact = opts.forSearch && !self && !family && !friends;
     if (hideContact) {
@@ -304,21 +312,23 @@ function publicUser(u, viewerId, opts = {}) {
       out.email = emailOk ? (u.email || "") : maskEmail(u.email);
     }
   }
-  if (showLoc && !opts.forSearch && u.lastLocation) {
+  if (showLoc && !opts.forSearch && u.lastLocation && (self || u.tracking)) {
     const loc = u.lastLocation;
     if (prefs.preciseLocation === false && !self) {
       out.lastLocation = {
         lat: fuzzCoord(loc.lat),
         lng: fuzzCoord(loc.lng),
         ts: prefs.showLastSeen === false && !self ? null : loc.ts,
-        approx: true
+        approx: true,
+        live: !!u.tracking
       };
     } else {
       out.lastLocation = {
         lat: loc.lat,
         lng: loc.lng,
         ts: prefs.showLastSeen === false && !self ? null : loc.ts,
-        approx: false
+        approx: false,
+        live: !!u.tracking
       };
     }
     if (opts.includeHistory) {
@@ -710,6 +720,7 @@ app.post("/api/register", async (req, res) => {
     return res.status(409).json({ error: "phone used" });
   }
 
+  const accountType = String((req.body || {}).accountType || "adult").toLowerCase() === "child" ? "child" : "adult";
   const u = {
     id: makeId("u"),
     name: nameTxt,
@@ -717,8 +728,18 @@ app.post("/api/register", async (req, res) => {
     phone: phoneTxt,
     password: hashPassword(password),
     createdAt: now(),
-    locationHistory: []
+    locationHistory: [],
+    accountType,
+    tracking: false
   };
+  if (accountType === "child") {
+    u.prefs = Object.assign(defaultPrefs(), {
+      allowMessagesFrom: "friends",
+      allowCallsFrom: "friends",
+      allowMarketplaceContact: false,
+      showProfileTo: "friends"
+    });
+  }
   DB.users.push(u);
   const sessionToken = createSession(u.id);
   saveData();
@@ -1041,6 +1062,12 @@ app.post("/api/location", auth, (req, res) => {
   const ts = now();
   req.user.lastLocation = { lat: la, lng: ln, ts };
   const kind = String(type || "live");
+  const trackingOn = (req.body && req.body.tracking) === false || kind === "preview" || kind === "approx"
+    ? false
+    : (req.body && req.body.tracking) === true
+      ? true
+      : (kind !== "preview" && kind !== "approx");
+  req.user.tracking = !!trackingOn;
   const force = record === true || kind === "minute" || kind === "trail" || kind === "manual";
   const prefs = userPrefs(req.user);
   let recorded = false;
@@ -1053,9 +1080,25 @@ app.post("/api/location", auth, (req, res) => {
     userId: req.userId,
     lat: la,
     lng: ln,
-    ts
+    ts,
+    tracking: !!req.user.tracking
   });
-  res.json({ ok: true, ts, recorded });
+  res.json({ ok: true, ts, recorded, tracking: !!req.user.tracking });
+});
+
+app.post("/api/me/tracking", auth, (req, res) => {
+  const on = !!(req.body && req.body.on);
+  req.user.tracking = on;
+  saveData();
+  broadcastToFamilyOf(req.userId, {
+    type: "location",
+    userId: req.userId,
+    lat: req.user.lastLocation ? req.user.lastLocation.lat : null,
+    lng: req.user.lastLocation ? req.user.lastLocation.lng : null,
+    ts: now(),
+    tracking: on
+  });
+  res.json({ ok: true, tracking: on });
 });
 
 app.delete("/api/me/history", auth, (req, res) => {
@@ -1086,6 +1129,7 @@ app.get("/api/locations", auth, (req, res) => {
     if (id !== req.userId && social.blockedBetween(DB, req.userId, id)) return;
     const prefs = userPrefs(u);
     if (id !== req.userId && prefs.appearOnMap === false) return;
+    if (id !== req.userId && !u.tracking) return;
     const loc = u.lastLocation;
     const approx = id !== req.userId && prefs.preciseLocation === false;
     locations.push({
@@ -1095,7 +1139,9 @@ app.get("/api/locations", auth, (req, res) => {
       lng: approx ? fuzzCoord(loc.lng) : loc.lng,
       ts: (id !== req.userId && prefs.showLastSeen === false) ? null : loc.ts,
       approx,
-      online: isOnline(id)
+      online: isOnline(id),
+      tracking: !!u.tracking,
+      live: !!u.tracking
     });
   });
   res.json({ ok: true, locations });
@@ -1152,26 +1198,31 @@ app.get("/api/families", auth, (req, res) => {
 });
 
 app.post("/api/families", auth, (req, res) => {
-  const { name, password, privacy } = req.body || {};
-  const f = {
-    id: makeId("f"),
-    name: String(name || "").trim() || ("Family " + randomHex(2)),
-    password: password ? hashPassword(password) : "",
-    privacy: privacy === "public" ? "public" : "private",
-    members: [req.userId],
-    invites: [],
-    ownerId: req.userId,
-    createdAt: now(),
-    roles: { [req.userId]: "owner" },
-    roleDefs: undefined
-  };
-  ensureFamilyRoles(f);
-  const token = mintInviteToken(f.id, req.userId);
-  f.invites.push(token);
-  DB.families.push(f);
-  saveData();
-  sendToUser(req.userId, { type: "family", action: "created", family: publicFamily(f) });
-  res.json({ ok: true, family: publicFamily(f), briefing: familyBriefing(f, req.userId) });
+  try {
+    const { name, password, privacy } = req.body || {};
+    const f = {
+      id: makeId("f"),
+      name: String(name || "").trim() || ("Family " + randomHex(2)),
+      password: password ? hashPassword(password) : "",
+      privacy: privacy === "public" ? "public" : "private",
+      members: [req.userId],
+      invites: [],
+      ownerId: req.userId,
+      createdAt: now(),
+      roles: { [req.userId]: "owner" },
+      roleDefs: undefined
+    };
+    ensureFamilyRoles(f);
+    const token = mintInviteToken(f.id, req.userId);
+    f.invites.push(token);
+    DB.families.push(f);
+    saveData();
+    sendToUser(req.userId, { type: "family", action: "created", family: publicFamily(f) });
+    res.json({ ok: true, family: publicFamily(f), briefing: familyBriefing(f, req.userId) });
+  } catch (e) {
+    logError("create family failed", { err: String(e && e.message || e) });
+    res.status(500).json({ error: "could not create family" });
+  }
 });
 
 app.post("/api/families/join", auth, (req, res) => {
@@ -1520,6 +1571,9 @@ app.post("/api/messages", auth, (req, res) => {
   if (social.blockedBetween(DB, req.userId, to)) return res.status(403).json({ error: "you cannot message this person" });
   const family = sharesFamily(req.userId, to);
   const friends = social.areFriends(DB, req.userId, to);
+  if (isChild(req.user) && !family && !friends) {
+    return res.status(403).json({ error: "child accounts can only message family and friends" });
+  }
   msgReq.ensure(DB);
   let mr = msgReq.pair(DB, req.userId, to);
   const connected = family || friends || (mr && mr.status === "accepted");

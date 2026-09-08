@@ -1,5 +1,5 @@
 /* GPS-FAMILIA service worker — app shell + lock-screen notifications */
-const CACHE = "gps-familia-v47";
+const CACHE = "gps-familia-v52";
 const SHELL = [
   "/",
   "/index.html",

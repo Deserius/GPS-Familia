@@ -1,4 +1,4 @@
-# GPS FAMILIA — architecture (v2.16.0)
+# GPS FAMILIA — architecture (v2.17.0)
 
 This is a **modular monolith**: one Node process, one JSON data file, one browser app.
 Modules are already split by domain (`*-server.js`). `server.js` is the composition root.

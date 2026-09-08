@@ -3,7 +3,7 @@ See ARCHITECTURE.txt for where to add features, performance rules, and /api/diag
 ================================================================================
 GPS-FAMILIA — DEVELOPER.TXT
 Implementation map, configuration, APIs, and step-by-step internals
-Version 2.16.0  ·  2026-09-07
+Version 2.17.0  ·  2026-09-07
 ================================================================================
 In-app Help is for family users only (no hosting/APK jargon). This file is
 the operator/developer companion. Deploy checklists: DEPLOY.txt.
@@ -14,12 +14,12 @@ a bug — calling was added on top of the existing chat.
 1. WHAT RUNS
 ------------
   node server.js          Express 5 + ws. Serves static files, REST, /ws.
-  VERSION                 2.16.0 (package.json, server.js health).
+  VERSION                 2.17.0 (package.json, server.js health).
   Data file               f360_data.json (users, families, messages, rooms,
                           places, VAPID keys, sessions). Created on first boot.
   Uploads                 /uploads  (feed photos/videos)
   Avatars                 /avatars  (65 icons + catalog.json)
-  PWA                     sw.js cache gps-familia-v47, manifest.json
+  PWA                     sw.js cache gps-familia-v48, manifest.json
 
   Key modules (do not flatten into one file):
     server.js             HTTP, auth, GPS, families, WS fan-out, attachCalls
@@ -49,7 +49,7 @@ a bug — calling was added on top of the existing chat.
   7. Demo: vito@familia.test / demo123   or tap a sample member.
      OTP 000000 when DEMO_MODE is true.
   8. curl http://127.0.0.1:3000/api/health
-      Expect: {"ok":true,"version":"2.16.0","realtime":true}
+      Expect: {"ok":true,"version":"2.17.0","realtime":true}
 
   If express MODULE_NOT_FOUND: npm install, then start again.
   Do not pkill in a way that deletes node_modules (sandbox snapshots
@@ -164,7 +164,7 @@ a bug — calling was added on top of the existing chat.
 
 10. SERVICE WORKER
 ------------------
-  CACHE = gps-familia-v47. Bump the string whenever styles.css / app.js /
+  CACHE = gps-familia-v48. Bump the string whenever styles.css / app.js /
   ui-call.js change so phones drop the old shell. SHELL includes /ui-call.js.
   Push: showNotification with tag + data.url. Calls/SOS use requireInteraction
   + high urgency; chat TTL 24h. Track-on ping for background GPS.
@@ -305,7 +305,7 @@ End of DEVELOPER.txt
   Demo listings: lst_demo_* flagged demo:true with photos in /market-demo/.
 
 
-15. PEOPLE GRAPH, QR, NOTIFICATIONS (v2.16.0)
+15. PEOPLE GRAPH, QR, NOTIFICATIONS (v2.17.0)
 ---------------------------------------------
   Relationship state is computed on the server (modules/social/graph.js).
   Frontend only renders `relationship.label` and `relationship.actions`.
@@ -341,4 +341,26 @@ End of DEVELOPER.txt
 
   UI: ☰ My QR, Scan QR, Notifications. Profile button on people cards.
   Tests: tests/suites/12-social-graph.js  (journeys A–E)
+
+16. LIVE PINS, CHILD ACCOUNTS, SEARCH (v2.17.0)
+-----------------------------------------------
+  Developer / copyright: Deserius Arte © 2026.
+
+  Family create: POST /api/families always mints an invite. Blank name becomes
+  "<user>'s Family". Client uses apiCatch so errors are shown. Families stay
+  in the directory until deleted. Public families are always searchable;
+  private families are invite-only.
+
+  Map: POST /api/location { tracking:false, type:"preview" } places YOU on your
+  map without sharing. Other members only receive a pin while tracking is true.
+  POST /api/me/tracking { on:false } hides you from others. Live pins pulse.
+
+  Child register: { accountType: "child" }. Marketplace 403. DMs only family
+  and friends. Friend requests and family invites still work.
+
+  Families are location-safety groups only. Friend requests, Accept, and
+  personal QR work with zero families. POST /api/people/invite without
+  familyId creates a friend request. GET /api/people/hub includes
+  incomingFriends / outgoingFriends. Preview iframe: Permissions-Policy
+  camera=*, microphone=*, geolocation=* so calls/QR scan can prompt.
 

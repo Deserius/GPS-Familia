@@ -33,7 +33,8 @@ const SUITES = [
   require("./suites/09-social"),
   require("./suites/10-market-pay"),
   require("./suites/11-architecture"),
-  require("./suites/12-social-graph")
+  require("./suites/12-social-graph"),
+  require("./suites/13-map-child-search")
 ];
 
 function parseArgs(argv) {

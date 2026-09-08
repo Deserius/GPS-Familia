@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>GPS FAMILIA</title>
   <meta name="theme-color" content="#0b0d0e" />
+  <meta http-equiv="Permissions-Policy" content="camera=*, microphone=*, geolocation=*, display-capture=*" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="GPS FAMILIA" />
@@ -13,7 +14,7 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="preload" as="image" href="splash_last_supper_mobsters.png" fetchpriority="high" />
-  <link rel="modulepreload" href="app.js?v=2160" />
+  <link rel="modulepreload" href="app.js?v=2172" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://unpkg.com" />
@@ -131,21 +132,22 @@
     <div id="splash-vignette"></div>
     <div id="splash-content">
       <h1 id="splash-title" class="gf-title" aria-label="GPS FAMILIA">
-        <span class="gf-l" style="--s:28px">G</span>
-        <span class="gf-l" style="--s:18px">P</span>
-        <span class="gf-l" style="--s:34px">S</span>
+        <span class="gf-l gf-gps" style="--s:32px">G</span>
+        <span class="gf-l gf-gps" style="--s:20px">P</span>
+        <span class="gf-l gf-gps" style="--s:38px">S</span>
         <span class="gf-gap" aria-hidden="true"></span>
-        <span class="gf-l" style="--s:16px">F</span>
-        <span class="gf-l" style="--s:30px">A</span>
-        <span class="gf-l" style="--s:22px">M</span>
-        <span class="gf-l" style="--s:36px">I</span>
-        <span class="gf-l" style="--s:18px">L</span>
-        <span class="gf-l" style="--s:26px">I</span>
-        <span class="gf-l" style="--s:20px">A</span>
+        <span class="gf-l" style="--s:18px">F</span>
+        <span class="gf-l" style="--s:34px">A</span>
+        <span class="gf-l" style="--s:24px">M</span>
+        <span class="gf-l" style="--s:40px">I</span>
+        <span class="gf-l" style="--s:20px">L</span>
+        <span class="gf-l" style="--s:30px">I</span>
+        <span class="gf-l" style="--s:22px">A</span>
       </h1>
       <div id="splash-sub" data-i18n="app.tagline">Family. Loyalty. Location.</div>
-      <button id="splash-continue" class="btn small" type="button" data-i18n="splash.enter">Enter</button>
+      <button id="splash-continue" class="splash-enter" type="button" data-i18n="splash.enter">Enter</button>
     </div>
+    <div id="splash-copy">© 2026 Deserius Arte · Hustler Anomalies Enterprises</div>
   </div>
 
   <script>
@@ -161,9 +163,21 @@
         overlay.style.zIndex = "0";
       }
       window.__hideSplash = hideSplash;
-      if (btn) btn.addEventListener("click", hideSplash);
+      function primeMedia() {
+        try {
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then(function (stream) {
+              (stream.getTracks() || []).forEach(function (tr) { try { tr.stop(); } catch (e) {} });
+            }).catch(function () {});
+          }
+        } catch (e) {}
+        try {
+          if (navigator.geolocation) navigator.geolocation.getCurrentPosition(function () {}, function () {}, { timeout: 8000, maximumAge: 60000 });
+        } catch (e) {}
+      }
+      if (btn) btn.addEventListener("click", function () { primeMedia(); hideSplash(); });
     })();
   </script>
-  <script type="module" src="app.js?v=2160"></script>
+  <script type="module" src="app.js?v=2172"></script>
 </body>
 </html>

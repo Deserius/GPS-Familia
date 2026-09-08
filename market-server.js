@@ -75,6 +75,14 @@ function attach(ctx) {
   const social = require("./social-server");
   ensure(DB);
 
+  function forbidChild(req, res, next) {
+    const u = getUser(req.userId);
+    if (u && (u.accountType === "child" || u.child === true)) {
+      return res.status(403).json({ error: "marketplace is not available on a child account" });
+    }
+    next();
+  }
+
   function seedDemoMarket() {
     const ts = now();
     const seed = [
@@ -140,7 +148,7 @@ function attach(ctx) {
     });
   }
 
-  app.get("/api/market", auth, (req, res) => {
+  app.get("/api/market", auth, forbidChild, (req, res) => {
     ensure(DB);
     seedDemoMarket();
     const q = String(req.query.q || "").trim().toLowerCase();
@@ -209,7 +217,7 @@ function attach(ctx) {
     });
   });
 
-  app.get("/api/market/:id", auth, (req, res) => {
+  app.get("/api/market/:id", auth, forbidChild, (req, res) => {
     ensure(DB);
     const row = DB.listings.find((l) => l.id === req.params.id);
     if (!row || row.status === "removed") return res.status(404).json({ error: "not found" });
@@ -229,7 +237,7 @@ function attach(ctx) {
     res.json({ ok: true, listing: serializeListing(row, req.userId, getUser), offers });
   });
 
-  app.post("/api/market", auth, (req, res) => {
+  app.post("/api/market", auth, forbidChild, (req, res) => {
     ensure(DB);
     const b = req.body || {};
     const title = String(b.title || "").trim().slice(0, 80);
@@ -281,7 +289,7 @@ function attach(ctx) {
     res.json({ ok: true, listing: serializeListing(row, req.userId, getUser) });
   });
 
-  app.patch("/api/market/:id", auth, (req, res) => {
+  app.patch("/api/market/:id", auth, forbidChild, (req, res) => {
     const row = (DB.listings || []).find((l) => l.id === req.params.id);
     if (!row) return res.status(404).json({ error: "not found" });
     if (row.sellerId !== req.userId) return res.status(403).json({ error: "only the seller can edit" });
@@ -302,7 +310,7 @@ function attach(ctx) {
     res.json({ ok: true, listing: serializeListing(row, req.userId, getUser) });
   });
 
-  app.delete("/api/market/:id", auth, (req, res) => {
+  app.delete("/api/market/:id", auth, forbidChild, (req, res) => {
     const row = (DB.listings || []).find((l) => l.id === req.params.id);
     if (!row) return res.status(404).json({ error: "not found" });
     if (row.sellerId !== req.userId) return res.status(403).json({ error: "only the seller can delete" });
@@ -313,7 +321,7 @@ function attach(ctx) {
     res.json({ ok: true });
   });
 
-  app.post("/api/market/:id/save", auth, (req, res) => {
+  app.post("/api/market/:id/save", auth, forbidChild, (req, res) => {
     const row = (DB.listings || []).find((l) => l.id === req.params.id);
     if (!row || row.status === "removed") return res.status(404).json({ error: "not found" });
     row.savedBy = Array.isArray(row.savedBy) ? row.savedBy : [];
@@ -324,7 +332,7 @@ function attach(ctx) {
     res.json({ ok: true, saved: row.savedBy.includes(req.userId) });
   });
 
-  app.post("/api/market/:id/message", auth, (req, res) => {
+  app.post("/api/market/:id/message", auth, forbidChild, (req, res) => {
     const row = (DB.listings || []).find((l) => l.id === req.params.id);
     if (!row || row.status === "removed") return res.status(404).json({ error: "not found" });
     if (row.sellerId === req.userId) return res.status(400).json({ error: "this is your listing" });
@@ -333,7 +341,7 @@ function attach(ctx) {
     res.json({ ok: true, to: row.sellerId, listingId: row.id, title: row.title });
   });
 
-  app.post("/api/market/:id/offer", auth, (req, res) => {
+  app.post("/api/market/:id/offer", auth, forbidChild, (req, res) => {
     const row = (DB.listings || []).find((l) => l.id === req.params.id);
     if (!row || row.status !== "active") return res.status(404).json({ error: "not found" });
     if (row.sellerId === req.userId) return res.status(400).json({ error: "cannot offer on your own listing" });
@@ -355,7 +363,7 @@ function attach(ctx) {
     res.json({ ok: true, offer: { id: o.id, amount: o.amount, status: o.status } });
   });
 
-  app.post("/api/market/:id/offers/:oid/accept", auth, (req, res) => {
+  app.post("/api/market/:id/offers/:oid/accept", auth, forbidChild, (req, res) => {
     const row = (DB.listings || []).find((l) => l.id === req.params.id);
     if (!row) return res.status(404).json({ error: "not found" });
     if (row.sellerId !== req.userId) return res.status(403).json({ error: "only the seller can accept" });
@@ -370,7 +378,7 @@ function attach(ctx) {
     res.json({ ok: true, listing: serializeListing(row, req.userId, getUser) });
   });
 
-  app.post("/api/market/:id/offers/:oid/decline", auth, (req, res) => {
+  app.post("/api/market/:id/offers/:oid/decline", auth, forbidChild, (req, res) => {
     const row = (DB.listings || []).find((l) => l.id === req.params.id);
     if (!row) return res.status(404).json({ error: "not found" });
     if (row.sellerId !== req.userId) return res.status(403).json({ error: "only the seller can decline" });

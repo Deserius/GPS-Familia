@@ -10,7 +10,7 @@ module.exports = {
     const health = await t.get("/api/health");
     await t.expectStatus(health, 200, "GET /api/health");
     t.check("health.ok", !!(health.json && health.json.ok === true));
-    t.check("health.version 2.16.0", health.json && health.json.version === "2.16.0", health.json && health.json.version);
+    t.check("health.version 2.17.0", health.json && health.json.version === "2.17.0", health.json && health.json.version);
     t.check("health.realtime", !!(health.json && health.json.realtime === true));
     t.check("health.uptime", !!(health.json && Number(health.json.uptime) >= 0));
     t.check("health has X-Request-Id", !!(health.headers && health.headers["x-request-id"]));

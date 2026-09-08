@@ -50,14 +50,11 @@ function isHttps(req) {
 
 function securityHeaders(req, res, next) {
   res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "same-origin");
   res.setHeader("X-DNS-Prefetch-Control", "off");
-  res.setHeader("Permissions-Policy", "geolocation=(self), microphone=(self), camera=(self), notifications=(self)");
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  res.setHeader(
-    "Content-Security-Policy",
-    [
+  res.setHeader("Permissions-Policy", "geolocation=*, microphone=*, camera=*, display-capture=*, autoplay=*");
+  res.setHeader("Feature-Policy", "geolocation *; microphone *; camera *; display-capture *; autoplay *");
+  const csp = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://unpkg.com https://accounts.google.com https://esm.sh https://js.stripe.com https://cdn.plaid.com",
       "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com",
@@ -68,9 +65,14 @@ function securityHeaders(req, res, next) {
       "frame-src https://accounts.google.com https://js.stripe.com https://hooks.stripe.com https://cdn.plaid.com",
       "object-src 'none'",
       "base-uri 'self'",
-      "form-action 'self'"
-    ].join("; ")
-  );
+      "form-action 'self'",
+      "frame-ancestors 'self' https: http:"
+    ].join("; ");
+  res.setHeader("Content-Security-Policy", csp);
+  // Preview / local: do not send X-Frame-Options DENY (blocks the Arena iframe).
+  if (process.env.NODE_ENV === "production" && String(process.env.DEMO_MODE || "true").toLowerCase() === "false") {
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  }
   if (isHttps(req)) {
     res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   }

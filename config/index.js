@@ -10,7 +10,7 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
-const VERSION = "2.16.0";
+const VERSION = "2.17.0";
 
 function loadDotEnv(file) {
   file = file || path.join(ROOT, ".env");

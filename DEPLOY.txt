@@ -39,7 +39,7 @@ CHECKLIST — local
   [ ] Log in / Register (or tap a sample family member; password demo123)
   [ ] You can register, create a family, turn Track On, send a message
   [ ] In-app messages are gold-framed popups — never the browser's ugly alert()
-  [ ] Health check: http://127.0.0.1:3000/api/health  shows {"ok":true,"version":"2.16.0",...}
+  [ ] Health check: http://127.0.0.1:3000/api/health  shows {"ok":true,"version":"2.17.0",...}
   [ ] Persist the uploads/ folder (feed photos and videos). Do not commit user media.
   [ ] Persist /avatars/ (65 profile icons: people, pets, emblems). Served as static files.
   [ ] /api/config includes vapidPublic (phone lock-screen alerts are armed)
@@ -562,7 +562,7 @@ CHECKLIST — keys
   [ ] Stripe / Plaid keys only if you want live Wallet (demo last4 works without)
   [ ] LIVEKIT_* only if group calls behind strict NAT fail
   [ ] OTP_ECHO=false and DEMO_MODE=false on the public host
-  [ ] curl https://YOUR-HOST/api/health  → version 2.16.0
+  [ ] curl https://YOUR-HOST/api/health  → version 2.17.0
   [ ] curl https://YOUR-HOST/api/config  → google / push / stripe / plaid flags
   [ ] Family invite: GET /api/invite/preview?token=... requires a session
       (401 unsigned). POST /api/families/join still auto-joins for tests.
